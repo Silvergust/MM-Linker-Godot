@@ -48,25 +48,49 @@ text = "Blender Link"
 align = 1
 
 [node name="ResolutionHBoxContainer" type="HBoxContainer" parent="Server/VBoxContainer"]
+visible = false
 margin_top = 18.0
 margin_right = 200.0
 margin_bottom = 38.0
 
 [node name="Label" type="Label" parent="Server/VBoxContainer/ResolutionHBoxContainer"]
-anchor_right = 0.5
 margin_top = 3.0
+margin_right = 72.0
 margin_bottom = 17.0
 text = "Resolution:"
 
 [node name="ResolutionOptions" type="OptionButton" parent="Server/VBoxContainer/ResolutionHBoxContainer"]
-anchor_left = 0.5
-anchor_right = 1.0
+margin_left = 76.0
+margin_right = 200.0
 margin_bottom = 20.0
 size_flags_horizontal = 3
 align = 2
 
-[node name="CloseButton" type="Button" parent="Server/VBoxContainer"]
-margin_top = 42.0
+[node name="ResolutionHBoxContainer2" type="HBoxContainer" parent="Server/VBoxContainer"]
+margin_top = 18.0
 margin_right = 200.0
-margin_bottom = 62.0
+margin_bottom = 32.0
+
+[node name="Label" type="Label" parent="Server/VBoxContainer/ResolutionHBoxContainer2"]
+margin_right = 43.0
+margin_bottom = 14.0
+text = "Status:"
+
+[node name="StatusLabel" type="Label" parent="Server/VBoxContainer/ResolutionHBoxContainer2"]
+anchor_left = 0.5
+anchor_right = 1.0
+margin_right = -15.0
+margin_bottom = 14.0
+text = "CXXXXXXXD"
+align = 2
+
+[node name="InfoLabel" type="Label" parent="Server/VBoxContainer"]
+margin_top = 36.0
+margin_right = 200.0
+margin_bottom = 50.0
+
+[node name="CloseButton" type="Button" parent="Server/VBoxContainer"]
+margin_top = 54.0
+margin_right = 200.0
+margin_bottom = 74.0
 text = "Close"

@@ -34,20 +34,20 @@ func _ready():
 	return
 	
 func _connected(id, proto):
-	print("Client %d connected with protocol: %s" % [id, proto])
+	inform("Client %d connected with protocol: %s" % [id, proto])
 	
 func _close_request(id, code, reason):
-	print("Client %d disconnecting with code: %d, reason: %s" % [id, code, reason])
+	inform("Client %d disconnecting with code: %d, reason: %s" % [id, code, reason])
 	
 func _disconnected(id, was_clean = false):
-	print("Client %d disconnected, clean: %s" % [id, str(was_clean)])
+	inform("Client %d disconnected, clean: %s" % [id, str(was_clean)])
 	
 func _on_data(id):
 	### TODO: Authentication 
 	print("Packet received.")
 	var pkt : PoolByteArray = _server.get_peer(id).get_packet()
 	var pkt_string : String = pkt.get_string_from_utf8()
-	print("Got data from client %d: %s, ... echoing" % [id, pkt_string.substr(0, 140)])
+	inform("Got data from client %d: %s, ... echoing" % [id, pkt_string.substr(0, 140)])
 	
 	var pkt_strings : PoolStringArray = pkt_string.split("|")
 	if pkt_strings.size() != 3:
@@ -114,7 +114,7 @@ func _on_data(id):
 			resp.append_array("||".to_utf8())
 			_server.get_peer(id).put_packet(resp)
 		ERROR:
-			print("Error packet received.")
+			inform("Error packet received.")
 		_:
 			print("Unable  to read packet prefix")
 	print("Finished _on_data")
@@ -142,7 +142,7 @@ func load_ptex(filepath : String):
 	_remote = get_remote()
 	find_parameters()
 	result.release(material_node)
-	print("Finished loading ptex file.")
+	inform("Finished loading ptex file.")
 	return response
 
 func render():
@@ -159,7 +159,7 @@ func get_remote() -> MMGenRemote:
 	for child in project.top_generator.get_children():
 		if child.get_type() == "remote":
 			return child
-	print("Warning: Remote node not found.")
+	inform("Warning: Remote node not found.")
 	return null
 
 func find_parameters_in_remote(remote_gen : MMGenRemote) -> Array:
@@ -210,6 +210,10 @@ func close() -> void:
 	print("Close()")
 	_server.stop()
 	get_parent().queue_free()
+	
+func inform(message : String) -> void:
+	print(message)
+	$VBoxContainer/InfoLabel.text = message
 	
 
 

@@ -10,8 +10,10 @@ var remote_params_gens_dict = {}
 var local_params_gens_dict = {}
 var responses : Array = []
 var error_message : String = ""
+var resolution : int = 1024
 
-enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE }
+enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE, SET_RESOLUTION }
+enum resolutions { _256,_512, _1024, _2048 }
 
 func _ready():
 	print("_ready()")
@@ -20,6 +22,15 @@ func _ready():
 	_server.connect("client_close_request", self, "_close_request")
 	_server.connect("data_received", self, "_on_data")
 	_server.listen(PORT)
+	
+	#print(get_node("CloseButton"))
+	#print(get_pare)
+	#$CloseButton.connect("button_pressed", self, "close")
+	$VBoxContainer/CloseButton.connect("pressed", self, "close")
+	var resOptionButton :  OptionButton = $VBoxContainer/ResolutionHBoxContainer/ResolutionOptions
+	for res in resolutions.values():
+		resOptionButton.add_item(str(pow(2, 8+res)))
+	resOptionButton.connect("item_selected", self, "set_resolution")
 	return
 	
 func _connected(id, proto):
@@ -115,7 +126,7 @@ func load_ptex(filepath : String):
 	var material_loaded = mm_globals.main_window.do_load_material(filepath, true, false)
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
-	var result = material_node.render(material_node, 0, 512)
+	var result = material_node.render(material_node, 0, resolution)
 	print("e")
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
@@ -130,7 +141,7 @@ func load_ptex(filepath : String):
 func render():
 	# Too similar to load_ptex()
 	var material_node = project.get_material_node()
-	var result = material_node.render(material_node, 0, 512)
+	var result = material_node.render(material_node, 0, resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
 	var output = result.texture.get_data().get_data()
@@ -184,6 +195,16 @@ func set_parameter_value(node_name : String, label : String, value : String, is_
 	var gen = dict["{}/{}".format([node_name, label], "{}")]
 	gen.set_parameter(label, value)
 	
+func set_resolution(resolution_index):
+	resolution = int(pow(2, 8+resolution_index))
+	print(resolution_index, resolution)
+	
+func close() -> void:
+	print("Close()")
+	_server.stop()
+	get_parent().queue_free()
+	
+
 
 func process_parameter_set_data(command_argument : String, command_image : String,  is_remote : bool):
 	var parameters_value_pair =  command_argument.split(":")

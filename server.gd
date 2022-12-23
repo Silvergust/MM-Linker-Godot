@@ -12,7 +12,7 @@ var responses : Array = []
 var error_message : String = ""
 var resolution : int = 1024
 
-enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE, SET_RESOLUTION }
+enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE, PING }
 enum resolutions { _256,_512, _1024, _2048 }
 
 func _ready():
@@ -58,6 +58,7 @@ func _on_data(id):
 	var command_argument : String = pkt_strings[2]
 	print("command_prefix: ", command_prefix, ", arguments: ", command_argument)
 	var response = PoolByteArray();
+	print("int(command_prefix): ", int(command_prefix), ", int(PING): ", int(PING))
 	match int(command_prefix):
 		LOAD:
 			response.push_back(0)
@@ -106,6 +107,12 @@ func _on_data(id):
 				resp = yield(resp, "completed")
 			print("resp: ", resp.get_string_from_utf8().substr(0, 140))
 			_server.get_peer(id).put_packet(resp.t)
+		PING:
+			var resp = PoolByteArray()
+			resp.push_back(0)
+			resp.push_back(6)
+			resp.append_array("||".to_utf8())
+			_server.get_peer(id).put_packet(resp)
 		ERROR:
 			print("Error packet received.")
 		_:

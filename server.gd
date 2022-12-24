@@ -1,6 +1,6 @@
 extends Control
 
-var PORT = 6001
+var PORT = 6000
 export var max_packet_size = 10000
 
 var _server : WebSocketServer = WebSocketServer.new()
@@ -65,7 +65,7 @@ func _on_data(id):
 		"ping":
 			var data_dict = { "command" : "pong" }
 			#var response = PoolByteArray()
-			send_data(id, data_dict)
+			send_json_data(id, data_dict)
 			#var response = PoolByteArray()
 			#var json_dict = to_json(data_dict)
 			#print("json_dict: ", json_dict)
@@ -89,18 +89,24 @@ func _on_data(id):
 			response.append_array(loaded_data)
 			#_server.get_peer(id).put_packet(response)
 			print("g")
-			var data_dict = { "command":"replace_image", "image_data":loaded_data }
+			#var data_dict = { "command":"replace_image", "image_data":loaded_data }
+			#var data_dict = '{ "command":"replace_image", "image_data":{} }'.format(loaded_data)
+			#var data_dict = '{ "command":"replace_image", "image_data":{} }'.format([loaded_data], "{}")
+			#var data_dict = '{ "command":"replace_image" }'
+			#data_dict["image_data"] = str(loaded_data)
 			#var data_dict = { "command":"replace_image" }
+			send_image_data(id, loaded_data)
 			print("h")
 			#response.append_array(loaded_ptex_data)
 			#send_data(id, data_dict) # Doesn't play nice with MM's rendering for some reason
 			#var response = PoolByteArray()
 			#var json_data = to_json(data_dict)
-			var json_data = JSON.print(data_dict)
-			print("json_data: ", json_data.substr(0,140))
+			#var json_data = JSON.print(data_dict)
+			#print("json_data: ", json_data.substr(0,140))
 			#print("json_data: ", json_data)
 			#response.append_array(json_data.to_utf8())
-			_server.get_peer(id).put_packet(response)
+			#_server.get_peer(id).put_packet(response)
+			#_server.get_peer(id).put_packet(data_dict.to_utf8())
 		_:
 			print("Unable  to read message command.")
 	return
@@ -185,11 +191,18 @@ func send_error(id : int, message : String) -> void:
 	response.append_array(message.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
-func send_data(id, data : Dictionary) -> void:
+func send_json_data(id : int, data : Dictionary) -> void:
 	var response = PoolByteArray()
+	response.append_array("json|".to_utf8()) # Unfortunately there's 
 	var json_data = to_json(data)
 	print("json_data: ", json_data)
 	response.append_array(json_data.to_utf8())
+	_server.get_peer(id).put_packet(response)
+	
+func send_image_data(id : int, data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
+	var response = PoolByteArray()
+	response.append_array("image|".to_utf8())
+	response.append_array(data)
 	_server.get_peer(id).put_packet(response)
 	
 func load_ptex(filepath : String):

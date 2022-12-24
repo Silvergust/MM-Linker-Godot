@@ -75,12 +75,12 @@ func _on_data(id):
 			#response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
 			var filepath : String = data["filepath"]
 			var loaded_data = load_ptex(filepath)
-			print("f")
-			print("data[filepath]: ", data["filepath"])
-			print("filepath: ", filepath)
-			print(typeof(data["filepath"]))
-			print(typeof("asdfasdf"))
-			print(typeof(filepath))
+#			print("f")
+#			print("data[filepath]: ", data["filepath"])
+#			print("filepath: ", filepath)
+#			print(typeof(data["filepath"]))
+#			print(typeof("asdfasdf"))
+#			print(typeof(filepath))
 			var response = PoolByteArray()
 			while loaded_data is GDScriptFunctionState:
 				print(loaded_data.is_valid())
@@ -94,9 +94,22 @@ func _on_data(id):
 			#var data_dict = '{ "command":"replace_image", "image_data":{} }'.format([loaded_data], "{}")
 			#var data_dict = '{ "command":"replace_image" }'
 			#data_dict["image_data"] = str(loaded_data)
-			#var data_dict = { "command":"replace_image" }
+			#var data_dict = { s"command":"replace_image" }
 			send_image_data(id, loaded_data)
 			print("h")
+			var remote_parameters = find_parameters_in_remote(_remote)			
+#			var remote_values_json = to_json(remote_values)
+#			remote_values_response.append_array(remote_values_json.to_utf8())
+#			_server.get_peer(id).put_packet(remote_values_response)
+			var set_remote_parameters_command = { "command":"init_parameters", "parameters_type":"remote", "parameters":remote_parameters}
+			
+			#remote_values_response.append_array(remote_values_json.to_utf8())
+			#_server.get_peer(id).put_packet(remote_values_response)
+			send_json_data(id, set_remote_parameters_command)
+			
+			var local_parameters = find_local_parameters()
+			var set_local_parameters_command = { "command":"init_parameters", "parameters_type":"local", "parameters":local_parameters}
+			send_json_data(id, set_local_parameters_command)
 			#response.append_array(loaded_ptex_data)
 			#send_data(id, data_dict) # Doesn't play nice with MM's rendering for some reason
 			#var response = PoolByteArray()
@@ -219,7 +232,7 @@ func load_ptex(filepath : String):
 	var response = result.texture.get_data().get_data()
 	
 	_remote = get_remote()
-	find_parameters()
+	find_local_parameters()
 	result.release(material_node)
 	inform("Finished loading ptex file.")
 	return response
@@ -255,7 +268,7 @@ func find_parameters_in_remote(remote_gen : MMGenRemote) -> Array:
 			remote_params_gens_dict["{}/{}".format([lw.node, lw.widget], "{}")] = top_gen
 	return output
 	
-func find_parameters() -> Array:
+func find_local_parameters() -> Array:
 	var output = []
 	for child in project.top_generator.get_children():
 		if child.get_type() == "remote":

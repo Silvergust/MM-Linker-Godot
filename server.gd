@@ -1,6 +1,6 @@
 extends Control
 
-var PORT = 6000
+var PORT = 6001
 export var max_packet_size = 10000
 
 var _server : WebSocketServer = WebSocketServer.new()
@@ -10,10 +10,15 @@ var remote_params_gens_dict = {}
 var local_params_gens_dict = {}
 var responses : Array = []
 var error_message : String = ""
-var resolution : int = 1024
+var resolution : int = 256
 
 enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE, PING }
 enum resolutions { _256,_512, _1024, _2048 }
+
+var command_key_requirements : Dictionary = {
+	"ping" : [],
+	"load_ptex" : ["filepath"]
+}
 
 func _ready():
 	print("_ready()")
@@ -46,78 +51,130 @@ func _on_data(id):
 	### TODO: Authentication 
 	print("Packet received.")
 	var pkt : PoolByteArray = _server.get_peer(id).get_packet()
-	var pkt_string : String = pkt.get_string_from_utf8()
+	var pkt_string : String = pkt.get_string_from_ascii()
+	#pkt_string = pkt_string.replace("'", "\"") # Annoying and most certainly inneficient
+	#pkt_string = pkt_string.replace("'", '"')
 	inform("Got data from client %d: %s, ... echoing" % [id, pkt_string.substr(0, 140)])
 	
-	var pkt_strings : PoolStringArray = pkt_string.split("|")
-	if pkt_strings.size() != 3:
-		send_error(id, "Incorrect prefix|argument split.")
-		return
-	var command_prefix : String = pkt_strings[0]
-	var command_image : String = pkt_strings[1]
-	var command_argument : String = pkt_strings[2]
-	print("command_prefix: ", command_prefix, ", arguments: ", command_argument)
-	var response = PoolByteArray();
-	print("int(command_prefix): ", int(command_prefix), ", int(PING): ", int(PING))
-	match int(command_prefix):
-		LOAD:
-			response.push_back(0)
-			response.push_back(1)
-			response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
-			var loaded_ptex_data = load_ptex(command_argument)
-			while loaded_ptex_data is GDScriptFunctionState:
-				loaded_ptex_data = yield(loaded_ptex_data, "completed")
-			response.append_array(loaded_ptex_data)
-			
+	print("pkt_string: ", pkt_string)
+	#var data = parse_json(parse_json(pkt_string))
+	var data = parse_json(pkt_string)
+	print("Data: ",str(data).substr(0,140))
+	var command : String = data["command"]
+	match command:
+		"ping":
+			var data_dict = { "command" : "pong" }
+			#var response = PoolByteArray()
+			send_data(id, data_dict)
+			#var response = PoolByteArray()
+			#var json_dict = to_json(data_dict)
+			#print("json_dict: ", json_dict)
+			#response.append_array(json_dict.to_utf8())
+			#_server.get_peer(id).put_packet(response)
+		"load_ptex":
+			#response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
+			var filepath : String = data["filepath"]
+			var loaded_data = load_ptex(filepath)
+			print("f")
+			print("data[filepath]: ", data["filepath"])
+			print("filepath: ", filepath)
+			print(typeof(data["filepath"]))
+			print(typeof("asdfasdf"))
+			print(typeof(filepath))
+			var response = PoolByteArray()
+			while loaded_data is GDScriptFunctionState:
+				print(loaded_data.is_valid())
+				loaded_data = yield(loaded_data, "completed")
+			print("Type: ", typeof(loaded_data))
+			response.append_array(loaded_data)
+			#_server.get_peer(id).put_packet(response)
+			print("g")
+			var data_dict = { "command":"replace_image", "image_data":loaded_data }
+			#var data_dict = { "command":"replace_image" }
+			print("h")
+			#response.append_array(loaded_ptex_data)
+			#send_data(id, data_dict) # Doesn't play nice with MM's rendering for some reason
+			#var response = PoolByteArray()
+			#var json_data = to_json(data_dict)
+			var json_data = JSON.print(data_dict)
+			print("json_data: ", json_data.substr(0,140))
+			#print("json_data: ", json_data)
+			#response.append_array(json_data.to_utf8())
 			_server.get_peer(id).put_packet(response)
-			
-			var remote_values_response = PoolByteArray()
-			remote_values_response.push_back(0)
-			remote_values_response.push_back(4)
-			remote_values_response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
-			var remote_values = find_parameters_in_remote(_remote)			
-			var remote_values_json = to_json(remote_values)
-			remote_values_response.append_array(remote_values_json.to_utf8())
-			_server.get_peer(id).put_packet(remote_values_response)
-			
-			var local_values_response = PoolByteArray()
-			local_values_response.push_back(0)
-			local_values_response.push_back(2)
-			local_values_response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
-			var local_values = find_parameters()
-			var local_values_json = to_json(local_values)
-			print("local_values_json: ", local_values_json)
-			local_values_response.append_array(local_values_json.to_utf8())
-			print("local_values_response: ", local_values_response)
-			_server.get_peer(id).put_packet(local_values_response)
-		INIT_PARAMETERS:
-			pass
-		SET_LOCAL_PARAMETER_VALUE:
-			var resp = process_parameter_set_data(command_argument, command_image, false)
-			while resp is GDScriptFunctionState:
-							resp = yield(resp, "completed")#			
-			var parameters_value_pair =  command_argument.split(":")
-			print("resp: ", resp.get_string_from_utf8().substr(0, 140))
-			_server.get_peer(id).put_packet(resp)
-		INIT_REMOTE_PARAMETERS:
-			pass
-		SET_REMOTE_PARAMETER_VALUE:
-			var resp = process_parameter_set_data(command_argument, command_image, true)
-			while resp is GDScriptFunctionState:
-				resp = yield(resp, "completed")
-			print("resp: ", resp.get_string_from_utf8().substr(0, 140))
-			_server.get_peer(id).put_packet(resp.t)
-		PING:
-			var resp = PoolByteArray()
-			resp.push_back(0)
-			resp.push_back(6)
-			resp.append_array("||".to_utf8())
-			_server.get_peer(id).put_packet(resp)
-		ERROR:
-			inform("Error packet received.")
 		_:
-			print("Unable  to read packet prefix")
-	print("Finished _on_data")
+			print("Unable  to read message command.")
+	return
+	
+#	var pkt_strings : PoolStringArray = pkt_string.split("|")
+#	if pkt_strings.size() != 3:
+#		send_error(id, "Incorrect prefix|argument split.")
+#		return
+#	var command_prefix : String = pkt_strings[0]
+#	var command_image : String = pkt_strings[1]
+#	var command_argument : String = pkt_strings[2]
+#	print("command_prefix: ", command_prefix, ", arguments: ", command_argument)
+#	var response = PoolByteArray();
+#	print("int(command_prefix): ", int(command_prefix), ", int(PING): ", int(PING))
+#	match int(command_prefix):
+#		LOAD:
+#			response.push_back(0)
+#			response.push_back(1)
+#			response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
+#			var loaded_ptex_data = load_ptex(command_argument)
+#			print("Command argument: ", command_argument)
+#			while loaded_ptex_data is GDScriptFunctionState:
+#				loaded_ptex_data = yield(loaded_ptex_data, "completed")
+#			response.append_array(loaded_ptex_data)
+#
+#			_server.get_peer(id).put_packet(response)
+#
+#			var remote_values_response = PoolByteArray()
+#			remote_values_response.push_back(0)
+#			remote_values_response.push_back(4)
+#			remote_values_response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
+#			var remote_values = find_parameters_in_remote(_remote)			
+#			var remote_values_json = to_json(remote_values)
+#			remote_values_response.append_array(remote_values_json.to_utf8())
+#			_server.get_peer(id).put_packet(remote_values_response)
+#
+#			var local_values_response = PoolByteArray()
+#			local_values_response.push_back(0)
+#			local_values_response.push_back(2)
+#			local_values_response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
+#			var local_values = find_parameters()
+#			var local_values_json = to_json(local_values)
+#			print("local_values_json: ", local_values_json)
+#			local_values_response.append_array(local_values_json.to_utf8())
+#			print("local_values_response: ", local_values_response)
+#			_server.get_peer(id).put_packet(local_values_response)
+#		INIT_PARAMETERS:
+#			pass
+#		SET_LOCAL_PARAMETER_VALUE:
+#			var resp = process_parameter_set_data(command_argument, command_image, false)
+#			while resp is GDScriptFunctionState:
+#							resp = yield(resp, "completed")#			
+#			var parameters_value_pair =  command_argument.split(":")
+#			print("resp: ", resp.get_string_from_utf8().substr(0, 140))
+#			_server.get_peer(id).put_packet(resp)
+#		INIT_REMOTE_PARAMETERS:
+#			pass
+#		SET_REMOTE_PARAMETER_VALUE:
+#			var resp = process_parameter_set_data(command_argument, command_image, true)
+#			while resp is GDScriptFunctionState:
+#				resp = yield(resp, "completed")
+#			print("resp: ", resp.get_string_from_utf8().substr(0, 140))
+#			_server.get_peer(id).put_packet(resp.t)
+#		PING:
+#			var resp = PoolByteArray()
+#			resp.push_back(0)
+#			resp.push_back(6)
+#			resp.append_array("||".to_utf8())
+#			_server.get_peer(id).put_packet(resp)
+#		ERROR:
+#			inform("Error packet received.")
+#		_:
+#			print("Unable  to read packet prefix")
+#	print("Finished _on_data")
 
 func send_error(id : int, message : String) -> void:
 	printerr("Error: ", message)
@@ -128,15 +185,24 @@ func send_error(id : int, message : String) -> void:
 	response.append_array(message.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
+func send_data(id, data : Dictionary) -> void:
+	var response = PoolByteArray()
+	var json_data = to_json(data)
+	print("json_data: ", json_data)
+	response.append_array(json_data.to_utf8())
+	_server.get_peer(id).put_packet(response)
 	
 func load_ptex(filepath : String):
 	var material_loaded = mm_globals.main_window.do_load_material(filepath, true, false)
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
+	print("material_node: ", material_node)
 	var result = material_node.render(material_node, 0, resolution)
 	print("e")
 	while result is GDScriptFunctionState:
+		print(result.is_valid())
 		result = yield(result, "completed")
+	print("h")
 	var response = result.texture.get_data().get_data()
 	
 	_remote = get_remote()

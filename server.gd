@@ -28,9 +28,6 @@ func _ready():
 	_server.connect("data_received", self, "_on_data")
 	_server.listen(PORT)
 	
-	#print(get_node("CloseButton"))
-	#print(get_pare)
-	#$CloseButton.connect("button_pressed", self, "close")
 	$VBoxContainer/CloseButton.connect("pressed", self, "close")
 	var resOptionButton :  OptionButton = $VBoxContainer/ResolutionHBoxContainer/ResolutionOptions
 	for res in resolutions.values():
@@ -52,74 +49,35 @@ func _on_data(id):
 	print("Packet received.")
 	var pkt : PoolByteArray = _server.get_peer(id).get_packet()
 	var pkt_string : String = pkt.get_string_from_ascii()
-	#pkt_string = pkt_string.replace("'", "\"") # Annoying and most certainly inneficient
-	#pkt_string = pkt_string.replace("'", '"')
 	inform("Got data from client %d: %s, ... echoing" % [id, pkt_string.substr(0, 140)])
 	
 	print("pkt_string: ", pkt_string)
-	#var data = parse_json(parse_json(pkt_string))
 	var data = parse_json(pkt_string)
 	print("Data: ",str(data).substr(0,140))
 	var command : String = data["command"]
 	match command:
 		"ping":
 			var data_dict = { "command" : "pong" }
-			#var response = PoolByteArray()
 			send_json_data(id, data_dict)
-			#var response = PoolByteArray()
-			#var json_dict = to_json(data_dict)
-			#print("json_dict: ", json_dict)
-			#response.append_array(json_dict.to_utf8())
-			#_server.get_peer(id).put_packet(response)
 		"load_ptex":
-			#response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
 			var filepath : String = data["filepath"]
 			var loaded_data = load_ptex(filepath)
-#			print("f")
-#			print("data[filepath]: ", data["filepath"])
-#			print("filepath: ", filepath)
-#			print(typeof(data["filepath"]))
-#			print(typeof("asdfasdf"))
-#			print(typeof(filepath))
+
 			var response = PoolByteArray()
 			while loaded_data is GDScriptFunctionState:
 				print(loaded_data.is_valid())
 				loaded_data = yield(loaded_data, "completed")
 			print("Type: ", typeof(loaded_data))
 			response.append_array(loaded_data)
-			#_server.get_peer(id).put_packet(response)
-			print("g")
-			#var data_dict = { "command":"replace_image", "image_data":loaded_data }
-			#var data_dict = '{ "command":"replace_image", "image_data":{} }'.format(loaded_data)
-			#var data_dict = '{ "command":"replace_image", "image_data":{} }'.format([loaded_data], "{}")
-			#var data_dict = '{ "command":"replace_image" }'
-			#data_dict["image_data"] = str(loaded_data)
-			#var data_dict = { s"command":"replace_image" }
 			send_image_data(id, loaded_data)
-			print("h")
+
 			var remote_parameters = find_parameters_in_remote(_remote)			
-#			var remote_values_json = to_json(remote_values)
-#			remote_values_response.append_array(remote_values_json.to_utf8())
-#			_server.get_peer(id).put_packet(remote_values_response)
 			var set_remote_parameters_command = { "command":"init_parameters", "parameters_type":"remote", "parameters":remote_parameters}
-			
-			#remote_values_response.append_array(remote_values_json.to_utf8())
-			#_server.get_peer(id).put_packet(remote_values_response)
 			send_json_data(id, set_remote_parameters_command)
 			
 			var local_parameters = find_local_parameters()
 			var set_local_parameters_command = { "command":"init_parameters", "parameters_type":"local", "parameters":local_parameters}
 			send_json_data(id, set_local_parameters_command)
-			#response.append_array(loaded_ptex_data)
-			#send_data(id, data_dict) # Doesn't play nice with MM's rendering for some reason
-			#var response = PoolByteArray()
-			#var json_data = to_json(data_dict)
-			#var json_data = JSON.print(data_dict)
-			#print("json_data: ", json_data.substr(0,140))
-			#print("json_data: ", json_data)
-			#response.append_array(json_data.to_utf8())
-			#_server.get_peer(id).put_packet(response)
-			#_server.get_peer(id).put_packet(data_dict.to_utf8())
 		_:
 			print("Unable  to read message command.")
 	return
@@ -206,7 +164,7 @@ func send_error(id : int, message : String) -> void:
 	
 func send_json_data(id : int, data : Dictionary) -> void:
 	var response = PoolByteArray()
-	response.append_array("json|".to_utf8()) # Unfortunately there's 
+	response.append_array("json|".to_utf8())
 	var json_data = to_json(data)
 	print("json_data: ", json_data)
 	response.append_array(json_data.to_utf8())

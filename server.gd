@@ -2,6 +2,7 @@ extends Control
 
 var PORT = 6000
 export var max_packet_size = 10000
+export var output_index = 0
 
 var _server : WebSocketServer = WebSocketServer.new()
 var project : MMGraphEdit
@@ -78,8 +79,26 @@ func _on_data(id):
 			var local_parameters = find_local_parameters()
 			var set_local_parameters_command = { "command":"init_parameters", "parameters_type":"local", "parameters":local_parameters}
 			send_json_data(id, set_local_parameters_command)
+		"parameter_change":
+			var node_name = data["parameter_label"].split("/")[0]
+			var parameter_label = data["parameter_label"].split("/")[1]
+			var render_result
+			print("parameter_change")
+			if data["parameter_type"] == "remote":
+				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], true)
+			elif data["parameter_type"] == "local":
+				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], false)
+			else:
+				inform("ERROR: Unable to determine parameter type.")
+			print("Sending image data")
+			while render_result is GDScriptFunctionState:
+				#print(render_result.is_valid())
+				render_result = yield(render_result, "completed")
+			send_image_data(id, render_result)
 		_:
 			print("Unable  to read message command.")
+		
+			
 	return
 	
 #	var pkt_strings : PoolStringArray = pkt_string.split("|")
@@ -181,7 +200,7 @@ func load_ptex(filepath : String):
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
 	print("material_node: ", material_node)
-	var result = material_node.render(material_node, 0, resolution)
+	var result = material_node.render(material_node, output_index, resolution)
 	print("e")
 	while result is GDScriptFunctionState:
 		print(result.is_valid())
@@ -198,7 +217,7 @@ func load_ptex(filepath : String):
 func render():
 	# Too similar to load_ptex()
 	var material_node = project.get_material_node()
-	var result = material_node.render(material_node, 0, resolution)
+	var result = material_node.render(material_node, output_index, resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
 	var output = result.texture.get_data().get_data()
@@ -250,7 +269,9 @@ func get_parameter_value(node_name : String, label : String):
 func set_parameter_value(node_name : String, label : String, value : String, is_remote : bool):
 	var dict = remote_params_gens_dict if is_remote else local_params_gens_dict
 	var gen = dict["{}/{}".format([node_name, label], "{}")]
+	print("A")
 	gen.set_parameter(label, value)
+	print("B")
 	
 func set_resolution(resolution_index):
 	resolution = int(pow(2, 8+resolution_index))
@@ -265,7 +286,13 @@ func inform(message : String) -> void:
 	print(message)
 	$VBoxContainer/InfoLabel.text = message
 	
-
+func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, is_remote : bool) -> void:
+	set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
+	var result = render()
+	while result is GDScriptFunctionState:
+		result = yield(result, "completed")
+	#response.append_array(result)
+	return result
 
 func process_parameter_set_data(command_argument : String, command_image : String,  is_remote : bool):
 	var parameters_value_pair =  command_argument.split(":")

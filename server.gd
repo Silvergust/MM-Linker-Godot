@@ -70,7 +70,7 @@ func _on_data(id):
 				loaded_data = yield(loaded_data, "completed")
 			print("Type: ", typeof(loaded_data))
 			response.append_array(loaded_data)
-			send_image_data(id, loaded_data)
+			send_image_data(id, data["image_name"], loaded_data)
 
 			var remote_parameters = find_parameters_in_remote(_remote)			
 			var set_remote_parameters_command = { "command":"init_parameters", "parameters_type":"remote", "parameters":remote_parameters}
@@ -94,7 +94,7 @@ func _on_data(id):
 			while render_result is GDScriptFunctionState:
 				#print(render_result.is_valid())
 				render_result = yield(render_result, "completed")
-			send_image_data(id, render_result)
+			send_image_data(id, data["image_name"], render_result)
 		_:
 			print("Unable  to read message command.")
 		
@@ -189,10 +189,13 @@ func send_json_data(id : int, data : Dictionary) -> void:
 	response.append_array(json_data.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
-func send_image_data(id : int, data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
+func send_image_data(id : int, image_name, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
 	var response = PoolByteArray()
-	response.append_array("image|".to_utf8())
-	response.append_array(data)
+	var prefix_size = 11 + len(image_name)
+	var prefix_size_string = str(prefix_size).pad_zeros(3)
+	print("prefix_size_string: ", prefix_size_string)
+	response.append_array("image|{}|{}|".format([prefix_size_string, image_name], "{}").to_utf8())
+	response.append_array(image_data)
 	_server.get_peer(id).put_packet(response)
 	
 func load_ptex(filepath : String):
@@ -312,7 +315,7 @@ func process_parameter_set_data(command_argument : String, command_image : Strin
 
 var i = 0
 func _process(delta):
-	if i % 30 == 0:
+	if i % 120 == 0:
 		print("Connection status: ", _server.get_connection_status())
 	i += 1
 	_server.poll()

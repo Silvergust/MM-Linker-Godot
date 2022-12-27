@@ -69,28 +69,28 @@ align = 2
 [node name="ResolutionHBoxContainer2" type="HBoxContainer" parent="Server/VBoxContainer"]
 margin_top = 18.0
 margin_right = 200.0
-margin_bottom = 32.0
+margin_bottom = 18.0
 
 [node name="Label" type="Label" parent="Server/VBoxContainer/ResolutionHBoxContainer2"]
+visible = false
 margin_right = 43.0
 margin_bottom = 14.0
 text = "Status:"
 
 [node name="StatusLabel" type="Label" parent="Server/VBoxContainer/ResolutionHBoxContainer2"]
-anchor_left = 0.5
-anchor_right = 1.0
-margin_right = -15.0
+visible = false
+margin_right = 74.0
 margin_bottom = 14.0
 text = "CXXXXXXXD"
 align = 2
 
 [node name="InfoLabel" type="Label" parent="Server/VBoxContainer"]
-margin_top = 36.0
+margin_top = 22.0
 margin_right = 200.0
-margin_bottom = 50.0
+margin_bottom = 36.0
 
 [node name="CloseButton" type="Button" parent="Server/VBoxContainer"]
-margin_top = 54.0
+margin_top = 40.0
 margin_right = 200.0
-margin_bottom = 74.0
+margin_bottom = 60.0
 text = "Close"

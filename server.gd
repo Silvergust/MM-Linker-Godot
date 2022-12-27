@@ -57,9 +57,11 @@ func _on_data(id):
 	print("Data: ",str(data).substr(0,140))
 	var command : String = data["command"]
 	match command:
+		
 		"ping":
 			var data_dict = { "command" : "pong" }
 			send_json_data(id, data_dict)
+			
 		"load_ptex":
 			var filepath : String = data["filepath"]
 			var loaded_data = load_ptex(filepath)
@@ -68,17 +70,23 @@ func _on_data(id):
 			while loaded_data is GDScriptFunctionState:
 				print(loaded_data.is_valid())
 				loaded_data = yield(loaded_data, "completed")
-			print("Type: ", typeof(loaded_data))
+			inform_and_send(id, "Finished loading ptex file.")
 			response.append_array(loaded_data)
 			send_image_data(id, data["image_name"], loaded_data)
 
 			var remote_parameters = find_parameters_in_remote(_remote)			
-			var set_remote_parameters_command = { "command":"init_parameters", "parameters_type":"remote", "parameters":remote_parameters}
-			send_json_data(id, set_remote_parameters_command)
 			
 			var local_parameters = find_local_parameters()
-			var set_local_parameters_command = { "command":"init_parameters", "parameters_type":"local", "parameters":local_parameters}
-			send_json_data(id, set_local_parameters_command)
+			
+			if data["reset_parameters"]:
+				var set_remote_parameters_command = { "command":"init_parameters", "image_name":data["image_name"], "parameters_type":"remote", "parameters":remote_parameters}		
+				send_json_data(id, set_remote_parameters_command)
+				var set_local_parameters_command = { "command":"init_parameters", "image_name":data["image_name"], "parameters_type":"local", "parameters":local_parameters}
+				send_json_data(id, set_local_parameters_command)
+			else:
+				var request_parameters_command = { "command":"request_parameters", "image_name":data["image_name"]}
+				send_json_data(id, request_parameters_command)
+				
 		"parameter_change":
 			var node_name = data["parameter_label"].split("/")[0]
 			var parameter_label = data["parameter_label"].split("/")[1]
@@ -89,14 +97,22 @@ func _on_data(id):
 			elif data["parameter_type"] == "local":
 				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], false)
 			else:
-				inform("ERROR: Unable to determine parameter type.")
-			print("Sending image data")
+				inform_and_send(id, "ERROR: Unable to determine parameter type.")
+
 			while render_result is GDScriptFunctionState:
-				#print(render_result.is_valid())
 				render_result = yield(render_result, "completed")
 			send_image_data(id, data["image_name"], render_result)
+			inform_and_send(id, "Parameter changed, render finished and sent.")
 		_:
-			print("Unable  to read message command.")
+			inform_and_send(id, "Unable  to read message command.")
+			
+		"set_multiple_parameters":
+			for parameter in data["parameters"]:
+				var node_name = parameter.split("/")[0]
+				var parameter_label = parameter.split("/")[1]
+				var parameter_value = parameter["parameter_value"]
+				var is_remote = parameter["parameter_type"] == "remote"
+				set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
 		
 			
 	return
@@ -172,20 +188,20 @@ func _on_data(id):
 #			print("Unable  to read packet prefix")
 #	print("Finished _on_data")
 
-func send_error(id : int, message : String) -> void:
-	printerr("Error: ", message)
-	var response = PoolByteArray()
-	response.push_back(0)
-	response.push_back(0)
-	response.append_array("|".to_utf8())
-	response.append_array(message.to_utf8())
-	_server.get_peer(id).put_packet(response)
+#func send_error(id : int, message : String) -> void:
+#	printerr("Error: ", message)
+#	var response = PoolByteArray()
+#	response.push_back(0)
+#	response.push_back(0)
+#	response.append_array("|".to_utf8())
+#	response.append_array(message.to_utf8())
+#	_server.get_peer(id).put_packet(response)
 	
 func send_json_data(id : int, data : Dictionary) -> void:
 	var response = PoolByteArray()
 	response.append_array("json|".to_utf8())
 	var json_data = to_json(data)
-	print("json_data: ", json_data)
+	#print("json_data: ", json_data)
 	response.append_array(json_data.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
@@ -193,7 +209,6 @@ func send_image_data(id : int, image_name, image_data : PoolByteArray) -> void: 
 	var response = PoolByteArray()
 	var prefix_size = 11 + len(image_name)
 	var prefix_size_string = str(prefix_size).pad_zeros(3)
-	print("prefix_size_string: ", prefix_size_string)
 	response.append_array("image|{}|{}|".format([prefix_size_string, image_name], "{}").to_utf8())
 	response.append_array(image_data)
 	_server.get_peer(id).put_packet(response)
@@ -202,19 +217,16 @@ func load_ptex(filepath : String):
 	var material_loaded = mm_globals.main_window.do_load_material(filepath, true, false)
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
-	print("material_node: ", material_node)
 	var result = material_node.render(material_node, output_index, resolution)
 	print("e")
 	while result is GDScriptFunctionState:
 		print(result.is_valid())
 		result = yield(result, "completed")
-	print("h")
 	var response = result.texture.get_data().get_data()
 	
 	_remote = get_remote()
 	find_local_parameters()
 	result.release(material_node)
-	inform("Finished loading ptex file.")
 	return response
 
 func render():
@@ -272,9 +284,8 @@ func get_parameter_value(node_name : String, label : String):
 func set_parameter_value(node_name : String, label : String, value : String, is_remote : bool):
 	var dict = remote_params_gens_dict if is_remote else local_params_gens_dict
 	var gen = dict["{}/{}".format([node_name, label], "{}")]
-	print("A")
 	gen.set_parameter(label, value)
-	print("B")
+	print("Parameter {}/{} set to {}".format([node_name, label, value], "{}"))
 	
 func set_resolution(resolution_index):
 	resolution = int(pow(2, 8+resolution_index))
@@ -288,6 +299,14 @@ func close() -> void:
 func inform(message : String) -> void:
 	print(message)
 	$VBoxContainer/InfoLabel.text = message
+	
+	
+func inform_and_send(id : int, message : String) -> void:
+	inform(message)
+	#var data = '{"command":"inform", "info":{}}'.format([message], "{}")
+	var data = { "command":"inform", "info":message }
+	send_json_data(id, data)
+	
 	
 func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, is_remote : bool) -> void:
 	set_parameter_value(node_name, parameter_label, parameter_value, is_remote)

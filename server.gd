@@ -33,7 +33,6 @@ func _ready():
 	var resOptionButton :  OptionButton = $VBoxContainer/ResolutionHBoxContainer/ResolutionOptions
 	for res in resolutions.values():
 		resOptionButton.add_item(str(pow(2, 8+res)))
-	resOptionButton.connect("item_selected", self, "set_resolution")
 	return
 	
 func _connected(id, proto):
@@ -83,6 +82,8 @@ func _on_data(id):
 				send_json_data(id, set_remote_parameters_command)
 				var set_local_parameters_command = { "command":"init_parameters", "image_name":data["image_name"], "parameters_type":"local", "parameters":local_parameters}
 				send_json_data(id, set_local_parameters_command)
+				var parameters_loaded_notify_command = { "command":"parameters_loaded"}
+				send_json_data(id, parameters_loaded_notify_command)
 			else:
 				var request_parameters_command = { "command":"request_parameters", "image_name":data["image_name"]}
 				send_json_data(id, request_parameters_command)
@@ -102,100 +103,27 @@ func _on_data(id):
 			while render_result is GDScriptFunctionState:
 				render_result = yield(render_result, "completed")
 			send_image_data(id, data["image_name"], render_result)
-			inform_and_send(id, "Parameter changed, render finished and sent.")
-		_:
-			inform_and_send(id, "Unable  to read message command.")
+			inform_and_send(id, "Parameter changed, render finished and transfered.")
 			
 		"set_multiple_parameters":
-			for parameter in data["parameters"]:
-				var node_name = parameter.split("/")[0]
-				var parameter_label = parameter.split("/")[1]
+			print(data)
+			for parameter_string in data["parameters"]:
+				var parameter = parse_json(parameter_string)
+				#print("parameter: ", parameter)
+				#print(typeof(parameter))
+				#print(typeof(["a"]))
+				#print(typeof( { "a":"b"} ))
+				var node_name = parameter["parameter_label"].split("/")[0]
+				var parameter_label = parameter["parameter_label"].split("/")[1]
 				var parameter_value = parameter["parameter_value"]
 				var is_remote = parameter["parameter_type"] == "remote"
 				set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
-		
+				
+		_:
+			inform_and_send(id, "Unable  to read message command.")
 			
-	return
-	
-#	var pkt_strings : PoolStringArray = pkt_string.split("|")
-#	if pkt_strings.size() != 3:
-#		send_error(id, "Incorrect prefix|argument split.")
-#		return
-#	var command_prefix : String = pkt_strings[0]
-#	var command_image : String = pkt_strings[1]
-#	var command_argument : String = pkt_strings[2]
-#	print("command_prefix: ", command_prefix, ", arguments: ", command_argument)
-#	var response = PoolByteArray();
-#	print("int(command_prefix): ", int(command_prefix), ", int(PING): ", int(PING))
-#	match int(command_prefix):
-#		LOAD:
-#			response.push_back(0)
-#			response.push_back(1)
-#			response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
-#			var loaded_ptex_data = load_ptex(command_argument)
-#			print("Command argument: ", command_argument)
-#			while loaded_ptex_data is GDScriptFunctionState:
-#				loaded_ptex_data = yield(loaded_ptex_data, "completed")
-#			response.append_array(loaded_ptex_data)
-#
-#			_server.get_peer(id).put_packet(response)
-#
-#			var remote_values_response = PoolByteArray()
-#			remote_values_response.push_back(0)
-#			remote_values_response.push_back(4)
-#			remote_values_response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
-#			var remote_values = find_parameters_in_remote(_remote)			
-#			var remote_values_json = to_json(remote_values)
-#			remote_values_response.append_array(remote_values_json.to_utf8())
-#			_server.get_peer(id).put_packet(remote_values_response)
-#
-#			var local_values_response = PoolByteArray()
-#			local_values_response.push_back(0)
-#			local_values_response.push_back(2)
-#			local_values_response.append_array(("|{}|".format([command_image], "{}").to_utf8()))
-#			var local_values = find_parameters()
-#			var local_values_json = to_json(local_values)
-#			print("local_values_json: ", local_values_json)
-#			local_values_response.append_array(local_values_json.to_utf8())
-#			print("local_values_response: ", local_values_response)
-#			_server.get_peer(id).put_packet(local_values_response)
-#		INIT_PARAMETERS:
-#			pass
-#		SET_LOCAL_PARAMETER_VALUE:
-#			var resp = process_parameter_set_data(command_argument, command_image, false)
-#			while resp is GDScriptFunctionState:
-#							resp = yield(resp, "completed")#			
-#			var parameters_value_pair =  command_argument.split(":")
-#			print("resp: ", resp.get_string_from_utf8().substr(0, 140))
-#			_server.get_peer(id).put_packet(resp)
-#		INIT_REMOTE_PARAMETERS:
-#			pass
-#		SET_REMOTE_PARAMETER_VALUE:
-#			var resp = process_parameter_set_data(command_argument, command_image, true)
-#			while resp is GDScriptFunctionState:
-#				resp = yield(resp, "completed")
-#			print("resp: ", resp.get_string_from_utf8().substr(0, 140))
-#			_server.get_peer(id).put_packet(resp.t)
-#		PING:
-#			var resp = PoolByteArray()
-#			resp.push_back(0)
-#			resp.push_back(6)
-#			resp.append_array("||".to_utf8())
-#			_server.get_peer(id).put_packet(resp)
-#		ERROR:
-#			inform("Error packet received.")
-#		_:
-#			print("Unable  to read packet prefix")
-#	print("Finished _on_data")
+		
 
-#func send_error(id : int, message : String) -> void:
-#	printerr("Error: ", message)
-#	var response = PoolByteArray()
-#	response.push_back(0)
-#	response.push_back(0)
-#	response.append_array("|".to_utf8())
-#	response.append_array(message.to_utf8())
-#	_server.get_peer(id).put_packet(response)
 	
 func send_json_data(id : int, data : Dictionary) -> void:
 	var response = PoolByteArray()
@@ -265,33 +193,39 @@ func find_local_parameters() -> Array:
 	for child in project.top_generator.get_children():
 		if child.get_type() == "remote":
 			continue
+#		if child.get_type() ==  "material_export":
+#		#	print("material_export node found!")
+#			continue
+		print("child.parameters: ", child.parameters)
 		for param in child.parameters:
 			local_params_gens_dict["{}/{}".format([child.get_hier_name(), param], "{}")] = child
-			output.push_back( { 'node' : child.get_hier_name(), 'param_label' : param, 'param_value' : child.get_parameter(param) } )
+			output.push_back( { 'node' : child.get_hier_name(), 'param_label' : param, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
 	print("local_params_gens_dict: ", local_params_gens_dict)
 	return output
 
-func get_parameter_value(node_name : String, label : String):
-	print("remote_params_gens_dict: ", remote_params_gens_dict)
-	print("node_name: ", node_name)
-	print("label: ", label)
+func get_parameter_value(node_name : String, label : String): # No longer in use
 	var gen = remote_params_gens_dict["{}/{}".format([node_name, label], "{}")]
-	print("gen: ", gen)
 	var parameter = gen.get_parameter(label)
-	print("parameter: ", parameter)
 	return parameter
 	
 func set_parameter_value(node_name : String, label : String, value : String, is_remote : bool):
 	var dict = remote_params_gens_dict if is_remote else local_params_gens_dict
 	var gen = dict["{}/{}".format([node_name, label], "{}")]
-	gen.set_parameter(label, value)
-	print("Parameter {}/{} set to {}".format([node_name, label, value], "{}"))
+	print("Parameter {}/{} about to be set to {}".format([node_name, label, value], "{}"))
+	print("gen.get_parameter_def(label).yoe: ", gen.get_parameter_def(label).type)
+	var type = gen.get_parameter_def(label).type
+	var typed_value = null
+	if  type == "enum" or type == "boolean":
+		typed_value = int(value)
+	elif type == "float":
+		typed_value = float(value)
+	elif type == "vector":
+		print(inform("Vector parameter values not implemented yet."))
+		return
+		#typed_value = vector4(value)
+	gen.set_parameter(label, typed_value)
 	
-func set_resolution(resolution_index):
-	resolution = int(pow(2, 8+resolution_index))
-	print(resolution_index, resolution)
-	
-func close() -> void:
+func close(id) -> void:
 	print("Close()")
 	_server.stop()
 	get_parent().queue_free()
@@ -300,13 +234,10 @@ func inform(message : String) -> void:
 	print(message)
 	$VBoxContainer/InfoLabel.text = message
 	
-	
 func inform_and_send(id : int, message : String) -> void:
 	inform(message)
-	#var data = '{"command":"inform", "info":{}}'.format([message], "{}")
 	var data = { "command":"inform", "info":message }
 	send_json_data(id, data)
-	
 	
 func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, is_remote : bool) -> void:
 	set_parameter_value(node_name, parameter_label, parameter_value, is_remote)

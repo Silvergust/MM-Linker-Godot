@@ -10,7 +10,6 @@
 shader = SubResource( 1 )
 
 [node name="WindowDialog" type="WindowDialog"]
-visible = true
 margin_right = 200.0
 margin_bottom = 120.0
 script = ExtResource( 1 )

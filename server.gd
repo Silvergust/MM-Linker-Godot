@@ -2,7 +2,7 @@ extends Control
 
 var PORT = 6000
 export var max_packet_size = 10000
-export var output_index = 0
+#export var output_index = 0
 
 var _server : WebSocketServer = WebSocketServer.new()
 var project : MMGraphEdit
@@ -11,10 +11,10 @@ var remote_params_gens_dict = {}
 var local_params_gens_dict = {}
 var responses : Array = []
 var error_message : String = ""
-var resolution : int = 256
+#var resolution : int = 256
 
-enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE, PING }
-enum resolutions { _256,_512, _1024, _2048 }
+#enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE, PING }
+#enum resolutions { _256,_512, _1024, _2048 }
 
 var command_key_requirements : Dictionary = {
 	"ping" : [],
@@ -31,8 +31,8 @@ func _ready():
 	
 	$VBoxContainer/CloseButton.connect("pressed", self, "close")
 	var resOptionButton :  OptionButton = $VBoxContainer/ResolutionHBoxContainer/ResolutionOptions
-	for res in resolutions.values():
-		resOptionButton.add_item(str(pow(2, 8+res)))
+	#for res in resolutions.values():
+	#	resOptionButton.add_item(str(pow(2, 8+res)))
 	return
 	
 func _connected(id, proto):
@@ -63,15 +63,15 @@ func _on_data(id):
 			
 		"load_ptex":
 			var filepath : String = data["filepath"]
-			var loaded_data = load_ptex(filepath)
-
-			var response = PoolByteArray()
-			while loaded_data is GDScriptFunctionState:
-				print(loaded_data.is_valid())
-				loaded_data = yield(loaded_data, "completed")
+#			var loaded_data = load_ptex(filepath)
+			load_ptex(filepath)
+#			var response = PoolByteArray()
+#			while loaded_data is GDScriptFunctionState:
+#				print(loaded_data.is_valid())
+#				loaded_data = yield(loaded_data, "completed")
 			inform_and_send(id, "Finished loading ptex file.")
-			response.append_array(loaded_data)
-			send_image_data(id, data["image_name"], loaded_data)
+			#response.append_array(loaded_data)
+			#send_image_data(id, data["image_name"], 2, loaded_data)
 
 			var remote_parameters = find_parameters_in_remote(_remote)			
 			
@@ -94,35 +94,31 @@ func _on_data(id):
 			var render_result
 			print("parameter_change")
 			if data["parameter_type"] == "remote":
-				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], true)
+				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], 0, data["resolution"], true)
 			elif data["parameter_type"] == "local":
-				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], false)
+				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], 0, data["resolution"],  false)
 			else:
 				inform_and_send(id, "ERROR: Unable to determine parameter type.")
 
 			while render_result is GDScriptFunctionState:
 				render_result = yield(render_result, "completed")
-			send_image_data(id, data["image_name"], render_result)
+			send_image_data(id, data["image_name"], 1, render_result) 
 			inform_and_send(id, "Parameter changed, render finished and transfered.")
 			
 		"set_multiple_parameters":
 			print(data)
 			for parameter_string in data["parameters"]:
 				var parameter = parse_json(parameter_string)
-				#print("parameter: ", parameter)
-				#print(typeof(parameter))
-				#print(typeof(["a"]))
-				#print(typeof( { "a":"b"} ))
 				var node_name = parameter["parameter_label"].split("/")[0]
 				var parameter_label = parameter["parameter_label"].split("/")[1]
 				var parameter_value = parameter["parameter_value"]
 				var is_remote = parameter["parameter_type"] == "remote"
 				set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
 				
+			var parameters_loaded_notify_command = { "command":"parameters_loaded"}
+			send_json_data(id, parameters_loaded_notify_command)
 		_:
-			inform_and_send(id, "Unable  to read message command.")
-			
-		
+			inform_and_send(id, "Unable  to read message command.")	
 
 	
 func send_json_data(id : int, data : Dictionary) -> void:
@@ -133,34 +129,35 @@ func send_json_data(id : int, data : Dictionary) -> void:
 	response.append_array(json_data.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
-func send_image_data(id : int, image_name, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
+func send_image_data(id : int, image_name : String, channels_amount : int, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
 	var response = PoolByteArray()
-	var prefix_size = 11 + len(image_name)
+	var prefix_size = 13 + len(image_name)
 	var prefix_size_string = str(prefix_size).pad_zeros(3)
-	response.append_array("image|{}|{}|".format([prefix_size_string, image_name], "{}").to_utf8())
+	response.append_array("image|{}|{}|{}|".format([prefix_size_string, image_name, channels_amount], "{}").to_utf8())
 	response.append_array(image_data)
 	_server.get_peer(id).put_packet(response)
 	
-func load_ptex(filepath : String):
+func load_ptex(filepath : String) -> void:
 	var material_loaded = mm_globals.main_window.do_load_material(filepath, true, false)
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
-	var result = material_node.render(material_node, output_index, resolution)
-	print("e")
-	while result is GDScriptFunctionState:
-		print(result.is_valid())
-		result = yield(result, "completed")
-	var response = result.texture.get_data().get_data()
+#	var result = material_node.render(material_node, output_index, resolution)
+#	#print("e")
+#	while result is GDScriptFunctionState:
+#		#print(result.is_valid())
+#		result = yield(result, "completed")
+#	var response = result.texture.get_data().get_data()
 	
 	_remote = get_remote()
 	find_local_parameters()
-	result.release(material_node)
-	return response
+	#result.release(material_node)
+	#return response
 
-func render():
+func render(output_index : int, resolution : int):
 	# Too similar to load_ptex()
 	var material_node = project.get_material_node()
-	var result = material_node.render(material_node, output_index, resolution)
+	print("Resolution: ", resolution)
+	var result = material_node.render(material_node, 0, resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
 	var output = result.texture.get_data().get_data()
@@ -215,14 +212,18 @@ func set_parameter_value(node_name : String, label : String, value : String, is_
 	print("gen.get_parameter_def(label).yoe: ", gen.get_parameter_def(label).type)
 	var type = gen.get_parameter_def(label).type
 	var typed_value = null
-	if  type == "enum" or type == "boolean":
+	if  type == "enum" or type == "boolean" or type == "size":
 		typed_value = int(value)
 	elif type == "float":
 		typed_value = float(value)
-	elif type == "vector":
-		print(inform("Vector parameter values not implemented yet."))
-		return
+	elif value.is_valid_integer():
+		typed_value = value
+		#if type == "size":
+		#	print("size: ", gen.get_parameter(label))
 		#typed_value = vector4(value)
+	else:
+		inform("Invalid parameter value input.")
+		return
 	gen.set_parameter(label, typed_value)
 	
 func close(id) -> void:
@@ -239,29 +240,29 @@ func inform_and_send(id : int, message : String) -> void:
 	var data = { "command":"inform", "info":message }
 	send_json_data(id, data)
 	
-func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, is_remote : bool) -> void:
+func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, output_index, resolution : int, is_remote : bool) -> void:
 	set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
-	var result = render()
+	var result = render(output_index, resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
 	#response.append_array(result)
 	return result
 
-func process_parameter_set_data(command_argument : String, command_image : String,  is_remote : bool):
-	var parameters_value_pair =  command_argument.split(":")
-	var new_value = parameters_value_pair[1]
-	var node_label_pair = parameters_value_pair[0].split("/")
-	set_parameter_value(node_label_pair[0], node_label_pair[1], new_value, is_remote)
-	
-	var response = PoolByteArray()
-	response.push_back(0)
-	response.push_back(1)
-	response.append_array(("|{}|".format([command_image], "{}")).to_utf8())
-	var result = render()
-	while result is GDScriptFunctionState:
-		result = yield(result, "completed")
-	response.append_array(result)
-	return response
+#func process_parameter_set_data(command_argument : String, command_image : String,  is_remote : bool):
+#	var parameters_value_pair =  command_argument.split(":")
+#	var new_value = parameters_value_pair[1]
+#	var node_label_pair = parameters_value_pair[0].split("/")
+#	set_parameter_value(node_label_pair[0], node_label_pair[1], new_value, is_remote)
+#
+#	var response = PoolByteArray()
+#	response.push_back(0)
+#	response.push_back(1)
+#	response.append_array(("|{}|".format([command_image], "{}")).to_utf8())
+#	var result = render()
+#	while result is GDScriptFunctionState:
+#		result = yield(result, "completed")
+#	response.append_array(result)
+#	return response
 
 var i = 0
 func _process(delta):

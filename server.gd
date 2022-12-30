@@ -2,7 +2,7 @@ extends Control
 
 var PORT = 6000
 export var max_packet_size = 10000
-#export var output_index = 0
+export var output_index = 1
 
 var _server : WebSocketServer = WebSocketServer.new()
 var project : MMGraphEdit
@@ -19,6 +19,18 @@ var error_message : String = ""
 var command_key_requirements : Dictionary = {
 	"ping" : [],
 	"load_ptex" : ["filepath"]
+}
+
+var map_to_output_index = {
+	"albedo" : 0,
+	"roughness" : 13,
+	"metallicity" : 12,
+	"normal" : 7,
+	"depth" : 8,
+	"sss" : 5,
+	"emission" : 2,
+	"occlusion" : 9,
+	"displace" : 8 
 }
 
 func _ready():
@@ -93,16 +105,19 @@ func _on_data(id):
 			var parameter_label = data["parameter_label"].split("/")[1]
 			var render_result
 			print("parameter_change")
-			if data["parameter_type"] == "remote":
-				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], 0, data["resolution"], true)
-			elif data["parameter_type"] == "local":
-				render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], 0, data["resolution"],  false)
-			else:
-				inform_and_send(id, "ERROR: Unable to determine parameter type.")
+			print("Output_index: ", output_index)
+			for map in data["maps"]:
+				print("map: ", map)
+				if data["parameter_type"] == "remote":
+					render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], map, data["resolution"], true)
+				elif data["parameter_type"] == "local":
+					render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], map, data["resolution"],  false)
+				else:
+					inform_and_send(id, "ERROR: Unable to determine parameter type.")
 
-			while render_result is GDScriptFunctionState:
-				render_result = yield(render_result, "completed")
-			send_image_data(id, data["image_name"], 1, render_result) 
+				while render_result is GDScriptFunctionState:
+					render_result = yield(render_result, "completed")
+				send_image_data(id, data["image_name"], get_output_size_factor(output_index), render_result) 
 			inform_and_send(id, "Parameter changed, render finished and transfered.")
 			
 		"set_multiple_parameters":
@@ -129,11 +144,11 @@ func send_json_data(id : int, data : Dictionary) -> void:
 	response.append_array(json_data.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
-func send_image_data(id : int, image_name : String, channels_amount : int, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
+func send_image_data(id : int, image_name : String, size_factor : int, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
 	var response = PoolByteArray()
 	var prefix_size = 13 + len(image_name)
 	var prefix_size_string = str(prefix_size).pad_zeros(3)
-	response.append_array("image|{}|{}|{}|".format([prefix_size_string, image_name, channels_amount], "{}").to_utf8())
+	response.append_array("image|{}|{}|{}|".format([prefix_size_string, image_name, size_factor], "{}").to_utf8())
 	response.append_array(image_data)
 	_server.get_peer(id).put_packet(response)
 	
@@ -153,14 +168,44 @@ func load_ptex(filepath : String) -> void:
 	#result.release(material_node)
 	#return response
 
+func get_output_size_factor(output_index : int):
+	return 1
+	
+func get_output_format(output_index : int):
+	var material_node = project.get_material_node()
+	print("shader_model.outputs: ", material_node.shader_model.outputs)
+	var type = material_node.shader_model.outputs[output_index].type
+	print("output type: ", type)
+	if type == "rgba" or type == "rgb":
+		print("type is ", type, ", returning 1")
+		return Image.FORMAT_RGBA8
+	if type == "f":
+		print("type is ", type, ", returning 2")
+		#return Image.FORMAT_RH
+		#return Image.FORMAT_RF
+		return Image.FORMAT_R8
+
 func render(output_index : int, resolution : int):
 	# Too similar to load_ptex()
 	var material_node = project.get_material_node()
-	print("Resolution: ", resolution)
-	var result = material_node.render(material_node, 0, resolution)
+	#print("Resolution: ", resolution)
+	print("shader_model.outputs: ", material_node.shader_model.outputs)
+	print("shader_model.exports: ", material_node.shader_model.exports.keys())
+	print("shader_model.get_input_defs(): ", material_node.get_input_defs())
+	print("shader_model.get_output_defs(): ", material_node.get_output_defs())
+	print("exports['Blender']: ", material_node.shader_model.exports["Blender"])
+	#var type = material_node.shader_model.outputs[output_index].type
+	#print("output type: ", type)
+	#var result = material_node.render(material_node, output_index, resolution)
+	var result = material_node.render(material_node, output_index, resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
-	var output = result.texture.get_data().get_data()
+	#var output = result.texture.get_data().get_data()
+	var image_output : Image = result.texture.get_data()
+	#image_output.format = Image.FORMAT_RGBA8
+	#image_output.convert(get_output_format(output_index))
+	image_output.convert(Image.FORMAT_RGBA8)
+	var output = image_output.get_data()
 	result.release(material_node)
 	return output
 		
@@ -240,9 +285,9 @@ func inform_and_send(id : int, message : String) -> void:
 	var data = { "command":"inform", "info":message }
 	send_json_data(id, data)
 	
-func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, output_index, resolution : int, is_remote : bool) -> void:
+func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, map : String, resolution : int, is_remote : bool) -> void:
 	set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
-	var result = render(output_index, resolution)
+	var result = render(map_to_output_index[map], resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
 	#response.append_array(result)

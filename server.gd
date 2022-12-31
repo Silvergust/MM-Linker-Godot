@@ -1,8 +1,8 @@
 extends Control
 
-var PORT = 6000
+var PORT = 6001
 export var max_packet_size = 10000
-export var output_index = 1
+#export var output_index = 1
 
 var _server : WebSocketServer = WebSocketServer.new()
 var project : MMGraphEdit
@@ -105,7 +105,7 @@ func _on_data(id):
 			var parameter_label = data["parameter_label"].split("/")[1]
 			var render_result
 			print("parameter_change")
-			print("Output_index: ", output_index)
+			#print("Output_index: ", output_index)
 			for map in data["maps"]:
 				print("map: ", map)
 				if data["parameter_type"] == "remote":
@@ -117,7 +117,9 @@ func _on_data(id):
 
 				while render_result is GDScriptFunctionState:
 					render_result = yield(render_result, "completed")
-				send_image_data(id, data["image_name"], get_output_size_factor(output_index), render_result) 
+				
+				name = (data["image_name"]) if (map == "albedo") else (data["image_name"] + "_" + map)
+				send_image_data(id, name, data["resolution"], render_result) 
 			inform_and_send(id, "Parameter changed, render finished and transfered.")
 			
 		"set_multiple_parameters":
@@ -144,11 +146,12 @@ func send_json_data(id : int, data : Dictionary) -> void:
 	response.append_array(json_data.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
-func send_image_data(id : int, image_name : String, size_factor : int, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
+func send_image_data(id : int, image_name : String, resolution : int, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
 	var response = PoolByteArray()
-	var prefix_size = 13 + len(image_name)
+	var prefix_size = 16 + len(image_name)
 	var prefix_size_string = str(prefix_size).pad_zeros(3)
-	response.append_array("image|{}|{}|{}|".format([prefix_size_string, image_name, size_factor], "{}").to_utf8())
+	var padded_resolution_string = str(resolution).pad_zeros(4)
+	response.append_array("image|{}|{}|{}|".format([prefix_size_string, image_name, padded_resolution_string], "{}").to_utf8())
 	response.append_array(image_data)
 	_server.get_peer(id).put_packet(response)
 	
@@ -168,22 +171,22 @@ func load_ptex(filepath : String) -> void:
 	#result.release(material_node)
 	#return response
 
-func get_output_size_factor(output_index : int):
-	return 1
+#func get_output_size_factor(output_index : int):
+#	return 1
 	
-func get_output_format(output_index : int):
-	var material_node = project.get_material_node()
-	print("shader_model.outputs: ", material_node.shader_model.outputs)
-	var type = material_node.shader_model.outputs[output_index].type
-	print("output type: ", type)
-	if type == "rgba" or type == "rgb":
-		print("type is ", type, ", returning 1")
-		return Image.FORMAT_RGBA8
-	if type == "f":
-		print("type is ", type, ", returning 2")
-		#return Image.FORMAT_RH
-		#return Image.FORMAT_RF
-		return Image.FORMAT_R8
+#func get_output_format(output_index : int):
+#	var material_node = project.get_material_node()
+#	print("shader_model.outputs: ", material_node.shader_model.outputs)
+#	var type = material_node.shader_model.outputs[output_index].type
+#	print("output type: ", type)
+#	if type == "rgba" or type == "rgb":
+#		print("type is ", type, ", returning 1")
+#		return Image.FORMAT_RGBA8
+#	if type == "f":
+#		print("type is ", type, ", returning 2")
+#		#return Image.FORMAT_RH
+#		#return Image.FORMAT_RF
+#		return Image.FORMAT_R8
 
 func render(output_index : int, resolution : int):
 	# Too similar to load_ptex()
@@ -287,6 +290,7 @@ func inform_and_send(id : int, message : String) -> void:
 	
 func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, map : String, resolution : int, is_remote : bool) -> void:
 	set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
+	print("ResolutioN: ", resolution)
 	var result = render(map_to_output_index[map], resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")

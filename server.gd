@@ -1,8 +1,7 @@
 extends Control
 
 var PORT = 6001
-export var max_packet_size = 10000
-#export var output_index = 1
+#export var max_packet_size = 10000
 
 var _server : WebSocketServer = WebSocketServer.new()
 var project : MMGraphEdit
@@ -11,10 +10,6 @@ var remote_params_gens_dict = {}
 var local_params_gens_dict = {}
 var responses : Array = []
 var error_message : String = ""
-#var resolution : int = 256
-
-#enum { ERROR, LOAD, INIT_PARAMETERS, SET_LOCAL_PARAMETER_VALUE, INIT_REMOTE_PARAMETERS, SET_REMOTE_PARAMETER_VALUE, PING }
-#enum resolutions { _256,_512, _1024, _2048 }
 
 var command_key_requirements : Dictionary = {
 	"ping" : [],
@@ -43,9 +38,6 @@ func _ready():
 	
 	$VBoxContainer/CloseButton.connect("pressed", self, "close")
 	var resOptionButton :  OptionButton = $VBoxContainer/ResolutionHBoxContainer/ResolutionOptions
-	#for res in resolutions.values():
-	#	resOptionButton.add_item(str(pow(2, 8+res)))
-	return
 	
 func _connected(id, proto):
 	inform("Client %d connected with protocol: %s" % [id, proto])
@@ -75,20 +67,10 @@ func _on_data(id):
 			
 		"load_ptex":
 			var filepath : String = data["filepath"]
-#			var loaded_data = load_ptex(filepath)
 			load_ptex(filepath)
-#			var response = PoolByteArray()
-#			while loaded_data is GDScriptFunctionState:
-#				print(loaded_data.is_valid())
-#				loaded_data = yield(loaded_data, "completed")
 			inform_and_send(id, "Finished loading ptex file.")
-			#response.append_array(loaded_data)
-			#send_image_data(id, data["image_name"], 2, loaded_data)
-
-			var remote_parameters = find_parameters_in_remote(_remote)			
-			
+			var remote_parameters = find_parameters_in_remote(_remote)		
 			var local_parameters = find_local_parameters()
-			
 			if data["reset_parameters"]:
 				var set_remote_parameters_command = { "command":"init_parameters", "image_name":data["image_name"], "parameters_type":"remote", "parameters":remote_parameters}		
 				send_json_data(id, set_remote_parameters_command)
@@ -105,7 +87,6 @@ func _on_data(id):
 			var parameter_label = data["parameter_label"].split("/")[1]
 			var render_result
 			print("parameter_change")
-			#print("Output_index: ", output_index)
 			for map in data["maps"]:
 				print("map: ", map)
 				if data["parameter_type"] == "remote":
@@ -142,7 +123,6 @@ func send_json_data(id : int, data : Dictionary) -> void:
 	var response = PoolByteArray()
 	response.append_array("json|".to_utf8())
 	var json_data = to_json(data)
-	#print("json_data: ", json_data)
 	response.append_array(json_data.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
@@ -159,54 +139,18 @@ func load_ptex(filepath : String) -> void:
 	var material_loaded = mm_globals.main_window.do_load_material(filepath, true, false)
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
-#	var result = material_node.render(material_node, output_index, resolution)
-#	#print("e")
-#	while result is GDScriptFunctionState:
-#		#print(result.is_valid())
-#		result = yield(result, "completed")
-#	var response = result.texture.get_data().get_data()
 	
 	_remote = get_remote()
 	find_local_parameters()
-	#result.release(material_node)
-	#return response
 
-#func get_output_size_factor(output_index : int):
-#	return 1
-	
-#func get_output_format(output_index : int):
-#	var material_node = project.get_material_node()
-#	print("shader_model.outputs: ", material_node.shader_model.outputs)
-#	var type = material_node.shader_model.outputs[output_index].type
-#	print("output type: ", type)
-#	if type == "rgba" or type == "rgb":
-#		print("type is ", type, ", returning 1")
-#		return Image.FORMAT_RGBA8
-#	if type == "f":
-#		print("type is ", type, ", returning 2")
-#		#return Image.FORMAT_RH
-#		#return Image.FORMAT_RF
-#		return Image.FORMAT_R8
 
 func render(output_index : int, resolution : int):
 	# Too similar to load_ptex()
 	var material_node = project.get_material_node()
-	#print("Resolution: ", resolution)
-	print("shader_model.outputs: ", material_node.shader_model.outputs)
-	print("shader_model.exports: ", material_node.shader_model.exports.keys())
-	print("shader_model.get_input_defs(): ", material_node.get_input_defs())
-	print("shader_model.get_output_defs(): ", material_node.get_output_defs())
-	print("exports['Blender']: ", material_node.shader_model.exports["Blender"])
-	#var type = material_node.shader_model.outputs[output_index].type
-	#print("output type: ", type)
-	#var result = material_node.render(material_node, output_index, resolution)
 	var result = material_node.render(material_node, output_index, resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
-	#var output = result.texture.get_data().get_data()
 	var image_output : Image = result.texture.get_data()
-	#image_output.format = Image.FORMAT_RGBA8
-	#image_output.convert(get_output_format(output_index))
 	image_output.convert(Image.FORMAT_RGBA8)
 	var output = image_output.get_data()
 	result.release(material_node)
@@ -222,6 +166,9 @@ func get_remote() -> MMGenRemote:
 func find_parameters_in_remote(remote_gen : MMGenRemote) -> Array:
 	remote_params_gens_dict.clear()
 	var output = []
+	if not remote_gen:
+		inform("No remote node found.")
+		return output
 	for widget in remote_gen.widgets:
 		for lw in widget.linked_widgets:
 			var top_gen = project.top_generator.get_node(lw.node)
@@ -238,9 +185,6 @@ func find_local_parameters() -> Array:
 	for child in project.top_generator.get_children():
 		if child.get_type() == "remote":
 			continue
-#		if child.get_type() ==  "material_export":
-#		#	print("material_export node found!")
-#			continue
 		print("child.parameters: ", child.parameters)
 		for param in child.parameters:
 			local_params_gens_dict["{}/{}".format([child.get_hier_name(), param], "{}")] = child
@@ -266,9 +210,6 @@ func set_parameter_value(node_name : String, label : String, value : String, is_
 		typed_value = float(value)
 	elif value.is_valid_integer():
 		typed_value = value
-		#if type == "size":
-		#	print("size: ", gen.get_parameter(label))
-		#typed_value = vector4(value)
 	else:
 		inform("Invalid parameter value input.")
 		return
@@ -294,7 +235,6 @@ func change_parameter_and_render(node_name : String, parameter_label : String, p
 	var result = render(map_to_output_index[map], resolution)
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
-	#response.append_array(result)
 	return result
 
 #func process_parameter_set_data(command_argument : String, command_image : String,  is_remote : bool):

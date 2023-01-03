@@ -1,6 +1,6 @@
 extends Control
 
-var PORT = 6001
+var port = 6001
 #export var max_packet_size = 10000
 
 var _server : WebSocketServer = WebSocketServer.new()
@@ -34,10 +34,9 @@ func _ready():
 	_server.connect("client_disconnected", self, "_disconnected")
 	_server.connect("client_close_request", self, "_close_request")
 	_server.connect("data_received", self, "_on_data")
-	_server.listen(PORT)
+	_server.listen(port)
 	
-	$VBoxContainer/CloseButton.connect("pressed", self, "close")
-	var resOptionButton :  OptionButton = $VBoxContainer/ResolutionHBoxContainer/ResolutionOptions
+	#$VBoxContainer/CloseButton.connect("pressed", self, "close")
 	
 func _connected(id, proto):
 	inform("Client %d connected with protocol: %s" % [id, proto])
@@ -288,3 +287,11 @@ func _process(delta):
 		print("Connection status: ", _server.get_connection_status())
 	i += 1
 	_server.poll()
+
+func try_set_port_string(port_string : String):
+	if not port_string.is_valid_integer():
+		return
+	
+func set_port(new_port : int):
+	print("Setting port to ", new_port)
+	port = new_port

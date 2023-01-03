@@ -2,7 +2,7 @@
 
 [ext_resource path="res://mml_linker/blender_linker_ui.gd" type="Script" id=1]
 [ext_resource path="res://mml_linker/server.gd" type="Script" id=2]
-[ext_resource path="res://addons/material_maker/engine/gen_texture.gd" type="Script" id=3]
+[ext_resource path="res://mml_linker/PortLineEdit.gd" type="Script" id=3]
 
 [sub_resource type="Shader" id=1]
 
@@ -10,6 +10,7 @@
 shader = SubResource( 1 )
 
 [node name="WindowDialog" type="WindowDialog"]
+visible = true
 margin_right = 200.0
 margin_bottom = 120.0
 script = ExtResource( 1 )
@@ -18,7 +19,6 @@ script = ExtResource( 1 )
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource( 2 )
-max_packet_size = 10000000
 
 [node name="Viewport" type="Viewport" parent="Server"]
 size = Vector2( 512, 512 )
@@ -27,11 +27,6 @@ size = Vector2( 512, 512 )
 material = SubResource( 2 )
 margin_right = 512.0
 margin_bottom = 512.0
-
-[node name="GenTexture" type="Control" parent="Server"]
-margin_right = 40.0
-margin_bottom = 40.0
-script = ExtResource( 3 )
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Server"]
 anchor_right = 1.0
@@ -65,10 +60,31 @@ margin_bottom = 20.0
 size_flags_horizontal = 3
 align = 2
 
-[node name="ResolutionHBoxContainer2" type="HBoxContainer" parent="Server/VBoxContainer"]
+[node name="PortHBoxContainer" type="HBoxContainer" parent="Server/VBoxContainer"]
 margin_top = 18.0
 margin_right = 200.0
-margin_bottom = 18.0
+margin_bottom = 42.0
+
+[node name="Label" type="Label" parent="Server/VBoxContainer/PortHBoxContainer"]
+anchor_right = 0.5
+anchor_bottom = 1.0
+margin_top = 5.0
+margin_right = -10.0
+text = "Port:"
+align = 2
+
+[node name="LineEdit" type="LineEdit" parent="Server/VBoxContainer/PortHBoxContainer"]
+anchor_left = 0.5
+anchor_right = 1.0
+margin_right = -10.0
+margin_bottom = 24.0
+text = "6001"
+script = ExtResource( 3 )
+
+[node name="ResolutionHBoxContainer2" type="HBoxContainer" parent="Server/VBoxContainer"]
+margin_top = 46.0
+margin_right = 200.0
+margin_bottom = 46.0
 
 [node name="Label" type="Label" parent="Server/VBoxContainer/ResolutionHBoxContainer2"]
 visible = false
@@ -84,12 +100,16 @@ text = "CXXXXXXXD"
 align = 2
 
 [node name="InfoLabel" type="Label" parent="Server/VBoxContainer"]
-margin_top = 22.0
+margin_top = 50.0
 margin_right = 200.0
-margin_bottom = 36.0
+margin_bottom = 64.0
 
 [node name="CloseButton" type="Button" parent="Server/VBoxContainer"]
-margin_top = 40.0
+margin_top = 68.0
 margin_right = 200.0
-margin_bottom = 60.0
+margin_bottom = 88.0
 text = "Close"
+
+[connection signal="text_entered" from="Server/VBoxContainer/PortHBoxContainer/LineEdit" to="Server/VBoxContainer/PortHBoxContainer/LineEdit" method="_on_LineEdit_text_entered"]
+[connection signal="valid_port_entered" from="Server/VBoxContainer/PortHBoxContainer/LineEdit" to="Server" method="set_port"]
+[connection signal="pressed" from="Server/VBoxContainer/CloseButton" to="." method="_on_CloseButton_pressed"]

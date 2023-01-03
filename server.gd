@@ -82,6 +82,16 @@ func _on_data(id):
 				var request_parameters_command = { "command":"request_parameters", "image_name":data["image_name"]}
 				send_json_data(id, request_parameters_command)
 				
+		"request_render":
+			print("Performing render")
+			var render_result
+			for map in data['maps']:
+				print("map: ", map)
+				render_result = render(map_to_output_index[map], data["resolution"])
+				while render_result is GDScriptFunctionState:
+						render_result = yield(render_result, "completed")
+				send_image_data(id, data['image_name'], data['resolution'], render_result) 
+				
 		"parameter_change":
 			#var node_name = data["parameter_label"].split("/")[0]
 			#var parameter_name = data["parameter_label"].split("/")[1]
@@ -179,7 +189,9 @@ func find_parameters_in_remote(remote_gen : MMGenRemote) -> Array:
 			var param = top_gen.get_parameter(lw.widget)
 			print("param: ", param)
 			print("lw", lw)
-			output.push_back( { 'node' : lw.node, 'param_name' : lw.widget, 'param_value' : param } )
+			print("type: ", typeof(lw))
+			print("widget: ", widget)
+			output.push_back( { 'node' : lw.node, 'param_name' : lw.widget, 'param_value' : param, 'param_label':widget.label } )
 			print("node: ", lw.node)
 			print("adding ", "{}/{}".format([lw.node, lw.widget], "{}"))
 			remote_params_gens_dict["{}/{}".format([lw.node, lw.widget], "{}")] = top_gen
@@ -200,10 +212,11 @@ func find_local_parameters() -> Array:
 			#if "text" in param:
 			#	identifier = "{}/{}".format([child.get_hier_name(), param], "{}")
 			local_params_gens_dict[identifier] = child
-			#print("param: ", param)
-			#print("child.get_parameter(param): ", child.get_parameter(param))
-			output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
+			print("param: ", param)
+			print("child.get_parameter(param): ", child.get_parameter(param))
+			#output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_label' : param.text, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
 			#output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
+			output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_label':"", 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
 	print("local_params_gens_dict: ", local_params_gens_dict)
 	return output
 

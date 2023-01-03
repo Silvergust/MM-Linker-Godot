@@ -118,13 +118,19 @@ func _on_data(id):
 			
 		"set_multiple_parameters":
 			print(data)
+			if local_params_gens_dict.empty() and remote_params_gens_dict.empty():
+				print("Finding parameters")
+				find_parameters_in_remote(_remote)		
+				find_local_parameters()
 			for parameter_string in data["parameters"]:
 				var parameter = parse_json(parameter_string)
-				var node_name = parameter["parameter_label"].split("/")[0]
-				var parameter_label = parameter["parameter_label"].split("/")[1]
-				var parameter_value = parameter["parameter_value"]
-				var is_remote = parameter["parameter_type"] == "remote"
-				set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
+				#var node_name = parameter["param_label"] #.split("/")[0]
+				var node_name = parameter["node_name"]
+				var param_name = parameter["param_name"]
+				var param_label = parameter["param_label"] #.split("/")[1]
+				var param_value = parameter["param_value"]
+				var is_remote = parameter["param_type"] == "remote"
+				set_parameter_value(node_name, param_name, param_value, is_remote)
 				
 			var parameters_loaded_notify_command = { "command":"parameters_loaded"}
 			send_json_data(id, parameters_loaded_notify_command)
@@ -211,6 +217,7 @@ func find_local_parameters() -> Array:
 			#if "text" in param:
 			#	identifier = "{}/{}".format([child.get_hier_name(), param], "{}")
 			local_params_gens_dict[identifier] = child
+			print("identifier: ", identifier)
 			print("param: ", param)
 			print("child.get_parameter(param): ", child.get_parameter(param))
 			#output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_label' : param.text, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
@@ -224,13 +231,14 @@ func get_parameter_value(node_name : String, label : String): # No longer in use
 	var parameter = gen.get_parameter(label)
 	return parameter
 	
-func set_parameter_value(node_name : String, label : String, value : String, is_remote : bool):
+func set_parameter_value(node_name : String, param_name : String, value : String, is_remote : bool):
 	var dict = remote_params_gens_dict if is_remote else local_params_gens_dict
-	var gen = dict["{}/{}".format([node_name, label], "{}")]
+	var identifier = "{}/{}".format([node_name, param_name], "{}")
+	var gen = dict[identifier]
 	#var gen = dict[node_name]
-	print("Parameter {}/{} about to be set to {}".format([node_name, label, value], "{}"))
-	print("gen.get_parameter_def(label).yoe: ", gen.get_parameter_def(label).type)
-	var type = gen.get_parameter_def(label).type
+	print("Parameter {}/{} about to be set to {}".format([node_name, param_name, value], "{}"))
+	print("gen.get_parameter_def(label).yoe: ", gen.get_parameter_def(param_name).type)
+	var type = gen.get_parameter_def(param_name).type
 	var typed_value = null
 	if  type == "enum" or type == "boolean" or type == "size":
 		typed_value = int(value)
@@ -241,7 +249,7 @@ func set_parameter_value(node_name : String, label : String, value : String, is_
 	else:
 		inform("Invalid parameter value input.")
 		return
-	gen.set_parameter(label, typed_value)
+	gen.set_parameter(param_name, typed_value)
 	
 func close(id) -> void:
 	print("Close()")
@@ -257,8 +265,8 @@ func inform_and_send(id : int, message : String) -> void:
 	var data = { "command":"inform", "info":message }
 	send_json_data(id, data)
 	
-func change_parameter_and_render(node_name : String, parameter_label : String, parameter_value : String, map : String, resolution : int, is_remote : bool) -> void:
-	set_parameter_value(node_name, parameter_label, parameter_value, is_remote)
+func change_parameter_and_render(node_name : String, param_name : String, parameter_value : String, map : String, resolution : int, is_remote : bool) -> void:
+	set_parameter_value(node_name, param_name, parameter_value, is_remote)
 	print("ResolutioN: ", resolution)
 	var result = render(map_to_output_index[map], resolution)
 	while result is GDScriptFunctionState:

@@ -83,16 +83,20 @@ func _on_data(id):
 				send_json_data(id, request_parameters_command)
 				
 		"parameter_change":
-			var node_name = data["parameter_label"].split("/")[0]
-			var parameter_label = data["parameter_label"].split("/")[1]
+			#var node_name = data["parameter_label"].split("/")[0]
+			#var parameter_name = data["parameter_label"].split("/")[1]
+			var node_name = data["node_name"]
+			var parameter_name = data["param_name"]
+			#var node_name = data["parameter_label"]
+			#var parameter_label = "UNUSED"
 			var render_result
 			print("parameter_change")
 			for map in data["maps"]:
 				print("map: ", map)
 				if data["parameter_type"] == "remote":
-					render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], map, data["resolution"], true)
+					render_result = change_parameter_and_render(node_name, parameter_name, data["param_value"], map, data["resolution"], true)
 				elif data["parameter_type"] == "local":
-					render_result = change_parameter_and_render(node_name, parameter_label, data["parameter_value"], map, data["resolution"],  false)
+					render_result = change_parameter_and_render(node_name, parameter_name, data["param_value"], map, data["resolution"],  false)
 				else:
 					inform_and_send(id, "ERROR: Unable to determine parameter type.")
 
@@ -174,7 +178,8 @@ func find_parameters_in_remote(remote_gen : MMGenRemote) -> Array:
 			var top_gen = project.top_generator.get_node(lw.node)
 			var param = top_gen.get_parameter(lw.widget)
 			print("param: ", param)
-			output.push_back( { 'node' : lw.node, 'param_label' : lw.widget, 'param_value' : param } )
+			print("lw", lw)
+			output.push_back( { 'node' : lw.node, 'param_name' : lw.widget, 'param_value' : param } )
 			print("node: ", lw.node)
 			print("adding ", "{}/{}".format([lw.node, lw.widget], "{}"))
 			remote_params_gens_dict["{}/{}".format([lw.node, lw.widget], "{}")] = top_gen
@@ -186,9 +191,19 @@ func find_local_parameters() -> Array:
 		if child.get_type() == "remote":
 			continue
 		print("child.parameters: ", child.parameters)
-		for param in child.parameters:
-			local_params_gens_dict["{}/{}".format([child.get_hier_name(), param], "{}")] = child
-			output.push_back( { 'node' : child.get_hier_name(), 'param_label' : param, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
+		for param in child.parameters:			
+			#local_params_gens_dict["{}/{}".format([child.get_hier_name(), param], "{}")] = child
+			print(typeof(local_params_gens_dict))
+			var identifier = "{}/{}".format([child.get_hier_name(), param], "{}")
+			if identifier in local_params_gens_dict:
+				inform("Repeated node parameter name ".format([identifier], "{}"))
+			#if "text" in param:
+			#	identifier = "{}/{}".format([child.get_hier_name(), param], "{}")
+			local_params_gens_dict[identifier] = child
+			#print("param: ", param)
+			#print("child.get_parameter(param): ", child.get_parameter(param))
+			output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
+			#output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
 	print("local_params_gens_dict: ", local_params_gens_dict)
 	return output
 
@@ -200,6 +215,7 @@ func get_parameter_value(node_name : String, label : String): # No longer in use
 func set_parameter_value(node_name : String, label : String, value : String, is_remote : bool):
 	var dict = remote_params_gens_dict if is_remote else local_params_gens_dict
 	var gen = dict["{}/{}".format([node_name, label], "{}")]
+	#var gen = dict[node_name]
 	print("Parameter {}/{} about to be set to {}".format([node_name, label, value], "{}"))
 	print("gen.get_parameter_def(label).yoe: ", gen.get_parameter_def(label).type)
 	var type = gen.get_parameter_def(label).type

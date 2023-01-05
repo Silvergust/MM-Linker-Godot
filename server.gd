@@ -1,15 +1,14 @@
 extends Control
-
-var port = 6001
-#export var max_packet_size = 10000
+class_name MMLServer
 
 var _server : WebSocketServer = WebSocketServer.new()
+var port = 6001
 var project : MMGraphEdit
 var _remote : MMGenRemote
 var remote_params_gens_dict = {}
 var local_params_gens_dict = {}
-var responses : Array = []
-var error_message : String = ""
+
+signal informing
 
 var command_key_requirements : Dictionary = {
 	"ping" : [],
@@ -29,14 +28,18 @@ var map_to_output_index = {
 }
 
 func _ready():
-	print("_ready()")
+	var error = _server.listen(port)
+	if error != OK:
+		inform("Error setting up server. (Has a server already been started?)")
+		queue_free()
+		return
 	_server.connect("client_connected", self, "_connected")
 	_server.connect("client_disconnected", self, "_disconnected")
 	_server.connect("client_close_request", self, "_close_request")
 	_server.connect("data_received", self, "_on_data")
-	_server.listen(port)
+	#var info_node = get_parent().info_node.connect("informing", self)
+	connect("informing", get_parent(), "_on_informing")
 	
-	#$VBoxContainer/CloseButton.connect("pressed", self, "close")
 	
 func _connected(id, proto):
 	inform("Client %d connected with protocol: %s" % [id, proto])
@@ -92,12 +95,8 @@ func _on_data(id):
 				send_image_data(id, data['image_name'], data['resolution'], render_result) 
 				
 		"parameter_change":
-			#var node_name = data["parameter_label"].split("/")[0]
-			#var parameter_name = data["parameter_label"].split("/")[1]
 			var node_name = data["node_name"]
 			var parameter_name = data["param_name"]
-			#var node_name = data["parameter_label"]
-			#var parameter_label = "UNUSED"
 			var render_result
 			print("parameter_change")
 			for map in data["maps"]:
@@ -124,10 +123,9 @@ func _on_data(id):
 				find_local_parameters()
 			for parameter_string in data["parameters"]:
 				var parameter = parse_json(parameter_string)
-				#var node_name = parameter["param_label"] #.split("/")[0]
 				var node_name = parameter["node_name"]
 				var param_name = parameter["param_name"]
-				var param_label = parameter["param_label"] #.split("/")[1]
+				var param_label = parameter["param_label"]
 				var param_value = parameter["param_value"]
 				var is_remote = parameter["param_type"] == "remote"
 				set_parameter_value(node_name, param_name, param_value, is_remote)
@@ -235,9 +233,6 @@ func set_parameter_value(node_name : String, param_name : String, value : String
 	var dict = remote_params_gens_dict if is_remote else local_params_gens_dict
 	var identifier = "{}/{}".format([node_name, param_name], "{}")
 	var gen = dict[identifier]
-	#var gen = dict[node_name]
-	print("Parameter {}/{} about to be set to {}".format([node_name, param_name, value], "{}"))
-	print("gen.get_parameter_def(label).yoe: ", gen.get_parameter_def(param_name).type)
 	var type = gen.get_parameter_def(param_name).type
 	var typed_value = null
 	if  type == "enum" or type == "boolean" or type == "size":
@@ -258,7 +253,8 @@ func close(id) -> void:
 	
 func inform(message : String) -> void:
 	print(message)
-	$VBoxContainer/InfoLabel.text = message
+	#$VBoxContainer/InfoLabel.text = message
+	emit_signal("informing", message)
 	
 func inform_and_send(id : int, message : String) -> void:
 	inform(message)
@@ -272,27 +268,11 @@ func change_parameter_and_render(node_name : String, param_name : String, parame
 	while result is GDScriptFunctionState:
 		result = yield(result, "completed")
 	return result
-
-#func process_parameter_set_data(command_argument : String, command_image : String,  is_remote : bool):
-#	var parameters_value_pair =  command_argument.split(":")
-#	var new_value = parameters_value_pair[1]
-#	var node_label_pair = parameters_value_pair[0].split("/")
-#	set_parameter_value(node_label_pair[0], node_label_pair[1], new_value, is_remote)
-#
-#	var response = PoolByteArray()
-#	response.push_back(0)
-#	response.push_back(1)
-#	response.append_array(("|{}|".format([command_image], "{}")).to_utf8())
-#	var result = render()
-#	while result is GDScriptFunctionState:
-#		result = yield(result, "completed")
-#	response.append_array(result)
-#	return response
-
+	
 var i = 0
 func _process(delta):
-	if i % 120 == 0:
-		print("Connection status: ", _server.get_connection_status())
+	#if i % 30 == 0:
+	#	print("Connection status: ", _server.get_connection_status())
 	i += 1
 	_server.poll()
 

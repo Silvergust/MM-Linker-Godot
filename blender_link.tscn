@@ -5,7 +5,6 @@
 [ext_resource path="res://mml_linker/PortLineEdit.gd" type="Script" id=3]
 
 [node name="WindowDialog" type="WindowDialog"]
-visible = true
 margin_right = 400.0
 margin_bottom = 130.0
 window_title = "Blender Link"

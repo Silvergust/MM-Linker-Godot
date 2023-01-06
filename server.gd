@@ -92,14 +92,25 @@ func _on_data(id):
 				render_result = render(map_to_output_index[map], data["resolution"])
 				while render_result is GDScriptFunctionState:
 						render_result = yield(render_result, "completed")
-				send_image_data(id, data['image_name'], data['resolution'], render_result) 
+				send_image_data(id, data['image_name'], map, data['resolution'], render_result) 
 				
 		"parameter_change":
 			var node_name = data["node_name"]
 			var parameter_name = data["param_name"]
 			var render_result
+			if not (data["parameter_type"] == "remote" or data["parameter_type"] == "local"):
+				inform("Error interpreting 'parameter_type' argument.")
+				return
+			var is_remote = data["parameter_type"] == "remote"
 			print("parameter_change")
+			if data["render"] == 'False':
+				print("AAAAAAAAAAAAA")
+				set_parameter_value(node_name, parameter_name, data['param_value'], is_remote)
+				return
+			if data["render"] != 'True':
+				inform("Error interpreting 'render' argument.")
 			for map in data["maps"]:
+				print("BBBBBBB")
 				print("map: ", map)
 				if data["parameter_type"] == "remote":
 					render_result = change_parameter_and_render(node_name, parameter_name, data["param_value"], map, data["resolution"], true)
@@ -111,8 +122,8 @@ func _on_data(id):
 				while render_result is GDScriptFunctionState:
 					render_result = yield(render_result, "completed")
 				
-				name = (data["image_name"]) if (map == "albedo") else (data["image_name"] + "_" + map)
-				send_image_data(id, name, data["resolution"], render_result) 
+				#name = (data["image_name"]) if (map == "albedo") else (data["image_name"] + "_" + map)
+				send_image_data(id, data["image_name"], map, data["resolution"], render_result) 
 			inform_and_send(id, "Parameter changed, render finished and transfered.")
 			
 		"set_multiple_parameters":
@@ -143,12 +154,13 @@ func send_json_data(id : int, data : Dictionary) -> void:
 	response.append_array(json_data.to_utf8())
 	_server.get_peer(id).put_packet(response)
 	
-func send_image_data(id : int, image_name : String, resolution : int, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
+func send_image_data(id : int, image_name : String, map : String, resolution : int, image_data : PoolByteArray) -> void: # Unfortunately there's apparently a limit to the size of elements in Godot's dictionaries, this is a workaround
 	var response = PoolByteArray()
-	var prefix_size = 16 + len(image_name)
+	var suffix = "_" + map if map != "albedo" else ""
+	var prefix_size = 16 + len(image_name) + len(suffix)
 	var prefix_size_string = str(prefix_size).pad_zeros(3)
 	var padded_resolution_string = str(resolution).pad_zeros(4)
-	response.append_array("image|{}|{}|{}|".format([prefix_size_string, image_name, padded_resolution_string], "{}").to_utf8())
+	response.append_array("image|{}|{}|{}|".format([prefix_size_string, image_name + suffix, padded_resolution_string], "{}").to_utf8())
 	response.append_array(image_data)
 	_server.get_peer(id).put_packet(response)
 	
@@ -156,7 +168,13 @@ func load_ptex(filepath : String) -> void:
 	var material_loaded = mm_globals.main_window.do_load_material(filepath, true, false)
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
-	
+	print("\n ############# ")
+	#print("Blender: ", material_node.shader_model.exports['Blender'])
+	for _export in material_node.shader_model.exports:
+		print(_export)
+		print(material_node.shader_model.exports[_export])
+	#print("Blender: ", material_node.shader_model.exports['Blender'])
+	print(" ############# \n")
 	_remote = get_remote()
 	find_local_parameters()
 

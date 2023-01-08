@@ -269,3 +269,5 @@ func try_set_port_string(port_string : String):
 func set_port(new_port : int):
 	print("Setting port to ", new_port)
 	port = new_port
+	_server.stop()
+	_server.listen(new_port)

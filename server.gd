@@ -85,10 +85,9 @@ func _on_data(id):
 				send_json_data(id, request_parameters_command)
 				
 		"request_render":
-			print("Performing render")
+			inform("Performing render")
 			var render_result
 			for map in data['maps']:
-				print("map: ", map)
 				render_result = render(map_to_output_index[map], data["resolution"])
 				while render_result is GDScriptFunctionState:
 						render_result = yield(render_result, "completed")
@@ -104,14 +103,11 @@ func _on_data(id):
 			var is_remote = data["parameter_type"] == "remote"
 			print("parameter_change")
 			if data["render"] == 'False':
-				print("AAAAAAAAAAAAA")
 				set_parameter_value(node_name, parameter_name, data['param_value'], is_remote)
 				return
 			if data["render"] != 'True':
 				inform("Error interpreting 'render' argument.")
 			for map in data["maps"]:
-				print("BBBBBBB")
-				print("map: ", map)
 				if data["parameter_type"] == "remote":
 					render_result = change_parameter_and_render(node_name, parameter_name, data["param_value"], map, data["resolution"], true)
 				elif data["parameter_type"] == "local":
@@ -122,14 +118,13 @@ func _on_data(id):
 				while render_result is GDScriptFunctionState:
 					render_result = yield(render_result, "completed")
 				
-				#name = (data["image_name"]) if (map == "albedo") else (data["image_name"] + "_" + map)
 				send_image_data(id, data["image_name"], map, data["resolution"], render_result) 
 			inform_and_send(id, "Parameter changed, render finished and transfered.")
 			
 		"set_multiple_parameters":
 			print(data)
 			if local_params_gens_dict.empty() and remote_params_gens_dict.empty():
-				print("Finding parameters")
+				inform("Finding parameters")
 				find_parameters_in_remote(_remote)		
 				find_local_parameters()
 			for parameter_string in data["parameters"]:
@@ -168,13 +163,6 @@ func load_ptex(filepath : String) -> void:
 	var material_loaded = mm_globals.main_window.do_load_material(filepath, true, false)
 	project = mm_globals.main_window.get_current_project()
 	var material_node = project.get_material_node()
-	print("\n ############# ")
-	#print("Blender: ", material_node.shader_model.exports['Blender'])
-	for _export in material_node.shader_model.exports:
-		print(_export)
-		print(material_node.shader_model.exports[_export])
-	#print("Blender: ", material_node.shader_model.exports['Blender'])
-	print(" ############# \n")
 	_remote = get_remote()
 	find_local_parameters()
 
@@ -208,13 +196,7 @@ func find_parameters_in_remote(remote_gen : MMGenRemote) -> Array:
 		for lw in widget.linked_widgets:
 			var top_gen = project.top_generator.get_node(lw.node)
 			var param = top_gen.get_parameter(lw.widget)
-			print("param: ", param)
-			print("lw", lw)
-			print("type: ", typeof(lw))
-			print("widget: ", widget)
 			output.push_back( { 'node' : lw.node, 'param_name' : lw.widget, 'param_value' : param, 'param_label':widget.label } )
-			print("node: ", lw.node)
-			print("adding ", "{}/{}".format([lw.node, lw.widget], "{}"))
 			remote_params_gens_dict["{}/{}".format([lw.node, lw.widget], "{}")] = top_gen
 	return output
 	
@@ -223,30 +205,16 @@ func find_local_parameters() -> Array:
 	for child in project.top_generator.get_children():
 		if child.get_type() == "remote":
 			continue
-		print("child.parameters: ", child.parameters)
-		for param in child.parameters:			
-			#local_params_gens_dict["{}/{}".format([child.get_hier_name(), param], "{}")] = child
+		for param in child.parameters:
 			print(typeof(local_params_gens_dict))
 			var identifier = "{}/{}".format([child.get_hier_name(), param], "{}")
 			if identifier in local_params_gens_dict:
 				inform("Repeated node parameter name ".format([identifier], "{}"))
-			#if "text" in param:
-			#	identifier = "{}/{}".format([child.get_hier_name(), param], "{}")
 			local_params_gens_dict[identifier] = child
-			print("identifier: ", identifier)
-			print("param: ", param)
-			print("child.get_parameter(param): ", child.get_parameter(param))
-			#output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_label' : param.text, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
-			#output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
 			output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_label':"", 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
 	print("local_params_gens_dict: ", local_params_gens_dict)
 	return output
 
-func get_parameter_value(node_name : String, label : String): # No longer in use
-	var gen = remote_params_gens_dict["{}/{}".format([node_name, label], "{}")]
-	var parameter = gen.get_parameter(label)
-	return parameter
-	
 func set_parameter_value(node_name : String, param_name : String, value : String, is_remote : bool):
 	var dict = remote_params_gens_dict if is_remote else local_params_gens_dict
 	var identifier = "{}/{}".format([node_name, param_name], "{}")
@@ -271,7 +239,6 @@ func close(id) -> void:
 	
 func inform(message : String) -> void:
 	print(message)
-	#$VBoxContainer/InfoLabel.text = message
 	emit_signal("informing", message)
 	
 func inform_and_send(id : int, message : String) -> void:
@@ -289,6 +256,7 @@ func change_parameter_and_render(node_name : String, param_name : String, parame
 	
 var i = 0
 func _process(delta):
+	# DEBUG:
 	#if i % 30 == 0:
 	#	print("Connection status: ", _server.get_connection_status())
 	i += 1

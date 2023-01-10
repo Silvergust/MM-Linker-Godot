@@ -206,10 +206,9 @@ func find_local_parameters() -> Array:
 		if child.get_type() == "remote":
 			continue
 		for param in child.parameters:
-			print(typeof(local_params_gens_dict))
 			var identifier = "{}/{}".format([child.get_hier_name(), param], "{}")
-			if identifier in local_params_gens_dict:
-				inform("Repeated node parameter name ".format([identifier], "{}"))
+			#if identifier in local_params_gens_dict:
+			#	inform("Repeated node parameter name ".format([identifier], "{}"))
 			local_params_gens_dict[identifier] = child
 			output.push_back( { 'node' : child.get_hier_name(), 'param_name' : param, 'param_label':"", 'param_value' : child.get_parameter(param), 'param_type':child.get_parameter_def(param) } )
 	print("local_params_gens_dict: ", local_params_gens_dict)

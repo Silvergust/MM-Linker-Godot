@@ -3,7 +3,7 @@
 # Material Maker Linker
 
 These are the files required to modify Material Maker so as to be able to connect with [Material Maker Linker](https://github.com/Silvergust/MM-Linker) and connect Blender with MM.
-Material Maker is a material generation tool by [RodZill4](https://github.com/RodZill4/material-maker), which as-is do not allow transfer of data between the user's programs. Applying these files to a MM project allows you to do just that. The important parts are:
+Material Maker is a material generation tool by [RodZill4](https://github.com/RodZill4/material-maker), which as-is does not allow transfer of data between the user's programs. Applying these files to a MM project allows you to do just that. The important parts are:
 
 * Server.gd, the heart of the program, a script that establishes a server and handles reception, interpretation and emition of data.
 * blender_link.tscn, a rudimentary UI to activate the server.

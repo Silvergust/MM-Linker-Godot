@@ -25,6 +25,4 @@ func blender_link() -> void:
 If you want to avoid all that you can just use the latest binary from the [release page](https://github.com/Silvergust/MM-Linker-Godot/releases/tag/Main_Release).
 
 # Donations
-If you find this software useful, please consider an Ethereum donation to the following address: 0xe04946Dfe2cdc98A0c812671B3492a4B21c70c11
-
-If you find the original Material Maker useful as-is, also consider a donation to that project.
+If you find the original Material Maker useful, also consider a donation to that project.
